@@ -1,0 +1,21 @@
+{
+  "name": "nn",
+  "version": "1.0.0",
+  "description": "",
+  "main": "test.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "chalk": "^4.1.0",
+    "keypress": "^0.2.1",
+    "net": "^1.0.2",
+    "nodemon": "^2.0.6",
+    "os-utils": "0.0.14",
+    "set-interval-async": "1.0.33",
+    "sha256": "^0.2.0",
+    "twos-complement-buffer": "^1.0.0"
+  }
+}

@@ -1,0 +1,15 @@
+{
+    "spawn": {
+        "position": {
+            "x": 3.5,
+            "y": 63,
+            "z": -49.5,
+            "stance": 63,
+            "onground": true
+        },
+        "rotation": {
+            "yaw": 0,
+            "pitch": 0
+        }
+    }
+}

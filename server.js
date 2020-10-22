@@ -1,0 +1,540 @@
+const path = require('path'),
+    net = require('net'),
+    fs = require('fs'),
+    zlib = require('zlib'),
+    createPacket = require('./scripts/createPacket.js'),
+    sha256 = require('sha256'),
+    decodePacket = require('./scripts/decodePacket.js'),
+    playerManager = require('./scripts/playerManager.js'),
+    logging = require('./scripts/logging'),
+    EventEmitter = require('events').EventEmitter
+
+var emitter = new EventEmitter()
+
+var commands = {}
+
+console.log("Starting server...")
+configuration = loadconfig()
+
+connections = {}
+serverData = {
+    time: 0,
+    days: 0,
+    ticks: 0,
+    lastTick: Date.now(),
+    lastTimeUpdate: Date.now()
+}
+
+const server = net.createServer(),
+    anticheat = require("./scripts/antiCheat.js")
+
+function loadconfig() {
+    emitter.removeAllListeners()
+    // console.log("=========================")
+    console.log("Loading properties.txt...")
+    let txt = fs.readFileSync('properties.txt').toString().split('\r\n')
+    let conf = {}
+
+    txt.forEach(c => {
+        if (c[0] == "#") return
+        if (c.length < 3) return
+        const dat = c.split('=')
+
+        var finalData
+
+        switch (dat[1]) {
+            case "true":
+                finalData = true
+                break
+            case "false":
+                finalData = false
+                break
+            default:
+                finalData = dat[1]
+        }
+
+        conf[dat[0]] = finalData
+    })
+
+    conf.nolog = conf.nolog.split(/,/g)
+    conf.trusted = JSON.parse(fs.readFileSync(conf.trusts).toString())
+
+    console.log("Setting configuration...")
+    configuration = conf
+
+    console.log("Updating PlayerManager...")
+    playerManager.setup()
+
+    console.log("=========================")
+
+    const setupData = {
+        functions: {
+            directMessage: directMessage,
+            broadcastMessage: broadcastMessage,
+            sendPacket: sendPacket,
+            broadcastPacket: broadcastPacket
+        },
+        server: emitter
+    }
+
+    console.log("Loading commands...")
+    commands = {}
+    fs.readdirSync(conf.commands).forEach(filename => {
+        try {
+            console.log(`${filename}...`)
+
+            const command = require(`${conf.commands}/${filename}`)
+
+            if (!command.hasOwnProperty("data")) throw new Error("Command does not have data in exports!")
+            if (!command.data.hasOwnProperty("name")) throw new Error("Command does not have name in data!")
+
+            command.data.op = command.data.op || false
+            command.data.requireSetup = command.data.requireSetup || false
+            command.data.requireCache = command.data.requireCache || false
+
+            commands[command.data.name] = command
+
+            if (command.data.requireSetup)
+                commands[command.data.name].setup(setupData)
+
+            if (!command.data.requireCache)
+                delete require.cache[path.join(__dirname, `${conf.commands}/${filename}`)]
+            else console.append("Cached...")
+
+            console.append("Done")
+
+
+        } catch (err) {
+            console.error(`Error loading ${filename}`)
+            console.log(err)
+        }
+    })
+
+    console.log("=========================")
+
+    console.log("Done!")
+
+    logging.start(broadcastMessage)
+
+    return conf
+}
+
+function logBuffer(buffer, skipID) {
+    const buf = buffer.toString('hex')
+    var s = ""
+    for (var i = skipID ? 2 : 0; i < buf.length; i += 2) {
+        s = s + buf.substr(i, 2) + " "
+    }
+    // console.log(s)
+}
+
+server.listen(configuration.port, function () {
+    console.log(`Server listening for connection requests on: localhost:${configuration.port}`);
+})
+
+server.on('connection', function (socket) {
+    socket.id = sha256(`${(Math.random() * 15)}#${Math.random() * 1000}`)
+    socket.created = Date.now()
+    console.log(`New connection (ID: ${socket.id})`)
+
+    socket.on('data', function (packet) {
+
+        const packetArray = splitPacket(packet, "ffff")
+
+        packetArray.forEach(p => {
+            const decoded = decodePacket(p, packet)
+            const packetID = decoded.id
+
+            if (configuration.logid && configuration.nolog.indexOf(packetID) == -1) console.log("incoming packet id:", packetID)
+            if (configuration.logpackets && configuration.nolog.indexOf(packetID) == -1) logBuffer(p)
+
+            try {
+                handlePacket(socket, p, packetID, decoded)
+            } catch (err) {
+                console.error("ERROR handling packet!")
+                console.log(err)
+            }
+        })
+    })
+
+    // When the client requests to end the TCP connection with the server, the server
+    // ends the connection.
+    socket.on('end', function () {
+        delete(connections[socket.id])
+        playerManager.removePlayer(socket.username)
+
+        if (socket.username && socket.destroyed == false)
+            broadcastMessage(`§e${socket.username} has left.`)
+        console.log(`Closing connection with socket (ID: ${socket.id})`)
+    })
+
+    // Don't forget to catch error, for your own sake.
+    socket.on('error', function (err) {
+        if (socket.username && socket.destroyed == false)
+            broadcastMessage(`§e${socket.username} has left.`)
+
+        console.error(err)
+    })
+})
+
+function splitPacket(packet, seperator) {
+    var buffArray = []
+    var seperator = seperator.toString(16)
+
+    const splitPacket = packet.toString('hex').split(seperator)
+    // console.log(splitPacket)
+    splitPacket.forEach(p => {
+        if ((p.slice(0, 2) == "ff" || p.slice(0, 2) == "00") && splitPacket.length > 1)
+            buffArray.push(Buffer.from("69" + seperator + p, 'hex'))
+        else
+            buffArray.push(Buffer.from(p, 'hex'))
+    })
+
+    // return buffArray
+    return [packet]
+}
+
+function handlePacket(socket, packet, packetID, decoded) {
+    // const arr = packet.toString().split('')
+    if (packetID == '0x00') {
+        // LOGIN packet
+        // NO IDEA
+        // Documentation of "Pre-release" protocol says this is a login initialize. (ALL OF THE PACKET IDS ARE DIFFERENT ON THERE.)
+        // ^ this documentation isn't for version 13 of the protocol.
+
+        // Byte 2 seems to be the position update packet ID (0x0b)
+        // It sometimes sends what seems to be a position update. (x:8.5 y:52.998404178607224 stance:54.618404183375596 z:8.5 onground:false)
+
+        const player = playerManager.getPlayer(socket.username)
+
+        if (player && player.status.state == "loading") {
+
+            const array = [{
+                data: player.position.x,
+                type: "double"
+            }, {
+                data: Math.max(1.6, player.position.y),
+                type: "double"
+            }, {
+                data: Math.max(0, player.position.stance),
+                type: "double"
+            }, {
+                data: player.position.z,
+                type: "double"
+            }, {
+                data: player.position.onground,
+                type: "boolean"
+            }]
+
+            const newpacket = createPacket("0b", array)
+
+            const id = packet.toString()
+            // "keepaliveid" doesn't really seem like an ID.
+            connections[socket.id].keepaliveid = id
+            connections[socket.id].ready = true
+
+            player.status = {
+                state: "loaded",
+                loaded: true
+            }
+
+            socket.write(packet)
+            socket.write(Buffer.from(fs.readFileSync(configuration.worldFolder + "/tempchunk.txt").toString(), "hex"))
+            socket.write(newpacket)
+        }
+        // player.update(player)
+
+    } else if (packetID == '0x01') {
+        // LOGIN packet?
+        // Packet ID 0x01 is sent AFTER 0x02.
+
+        // const login = decodePacket(packet)
+        const username = decoded.data.username
+
+        connections[socket.id] = {
+            username: username,
+            socket: socket,
+            ready: false
+        }
+
+        var player = playerManager.getPlayer(username)
+
+        player.status = {
+            state: "loading",
+            loaded: false
+        }
+
+        socket.username = username
+
+        const packet01response = Buffer.from(fs.readFileSync(configuration.worldFolder + "/packet01response.txt").toString(), "hex")
+        socket.write(packet01response)
+        broadcastMessage(`§e${socket.username} has joined.`)
+        emitter.emit("join", playerManager.getPlayer(username))
+
+        socket.write(createPacket("04", [{
+            data: serverData.time,
+            type: "long"
+        }]))
+    } else if (packetID == '0x02') {
+        // LOGIN packet?
+        // Sending what seems to be identical data back works.
+
+        const username = decoded.data.username
+
+        // console.log("Packet ID 0x02:",string)
+        // The client sends its USERNAME. This could be the login packet.
+
+        // If the playerdata doesn't exist, create it.
+        if (username != null) {
+            playerManager.getPlayer(username)
+            broadcastMessage(`§e${username} has joined.`)
+            emitter.emit("join", playerManager.getPlayer(username))
+        }
+
+        // no idea what this means. just sending data the official server sends.
+        const array = [{
+            data: "-",
+            type: "string"
+        }]
+
+        const p = createPacket("02", array)
+
+        socket.write(p)
+    } else if (packetID == '0x03') {
+        // CHAT packet
+
+        const content = decoded.data.text
+        const message = `${socket.username}${configuration.userSuffix}${content}`
+
+        const res = checkCommand(connections[socket.id], content)
+
+        if (!res) {
+            broadcastMessage(message)
+            emitter.emit("chat", playerManager.getPlayer(socket.username))
+        }
+    } else if (packetID == "0x0b") {
+        // POSITION UPDATE packet
+
+        var player = playerManager.getPlayer(socket.username)
+        player.position = decoded.data.position
+
+    } else if (packetID == "0x0c") {
+        // ROTATION UPDATE packet
+
+        var player = playerManager.getPlayer(socket.username)
+        player.rotation = decoded.data.rotation
+
+    } else if (packetID == "0x0d") {
+        // POSITION & ROTATION UPDATE packet
+
+        var player = playerManager.getPlayer(socket.username)
+
+        player.position = decoded.data.position
+        player.rotation = decoded.data.rotation
+
+    } else if (packetID == "0x10") {
+        const data = decoded.data
+
+        playerManager.getPlayer(socket.username).data.inventory.slot = data.slot
+    } else if (packetID == "0xff") {
+        // LOGOUT packet
+        var player = playerManager.getPlayer(socket.username)
+
+        emitter.emit("leave", player)
+
+        player.status = {
+            state: "left",
+            loaded: false
+        }
+
+        if (socket.username)
+            broadcastMessage(`§e${socket.username} has left.`)
+
+        connections[socket.id].nochat = true
+        connections[socket.id].socket.destroyed = true
+    }
+
+    if (configuration.useAntiCheat) anticheat(socket)
+}
+
+async function serverTick() {
+    const currentTime = Date.now()
+    var offset = (currentTime - serverData.lastTick) - 50
+
+    if (currentTime - serverData.lastTick >= 250) console.warn("WARNING: Abnormal tick (over 0.25 seconds)")
+    if (currentTime - serverData.lastTick >= 5000) console.warn("ALERT: Last tick was over five seconds ago! You should probably figure out what's making it lag!")
+    if (currentTime - serverData.lastTimeUpdate >= 1000) {
+        const keys = Object.keys(connections)
+
+        const packet = createPacket("04", [{
+            data: serverData.time,
+            type: "long"
+        }])
+
+        keys.forEach(key => {
+            let conn = connections[key]
+
+            if (playerManager.getPlayer(conn.socket.username).status.loaded)
+                conn.socket.write(packet)
+        })
+
+        serverData.lastTimeUpdate = currentTime
+    }
+
+    serverData.time++
+
+    if (serverData.time >= 24000) {
+        serverData.days++
+        serverData.time = 0
+    }
+
+    serverData.ticks++
+    serverData.lastTick = currentTime
+
+
+    setTimeout(serverTick, 50 - offset)
+}
+
+// chat height is 20 rows.
+async function broadcastMessage(message) {
+    const array = [{
+        data: message.toString(),
+        type: "string"
+    }]
+
+    const packet = createPacket("03", array)
+
+    const keys = Object.keys(connections)
+
+    keys.forEach(key => {
+        let conn = connections[key]
+        if (conn.socket.destroyed == false)
+            conn.socket.write(packet)
+    })
+
+    logging.chat.logChat(message, "white")
+}
+
+// chat height is 20 rows.
+async function directMessage(connection, message) {
+    const array = [{
+        data: message.toString(),
+        type: "string"
+    }]
+
+    const packet = createPacket("03", array)
+
+    connection.socket.write(packet)
+
+    logging.chat.logChat(message, "white")
+}
+
+function sendPacket(username, buffer) {
+    Object.keys(connections).forEach(key => {
+        if (connections[key].socket.username == username)
+            connections[key].socket.write(buffer)
+    })
+}
+
+function broadcastPacket(buffer) {
+    Object.keys(connections).forEach(key => {
+        connections[key].socket.write(buffer)
+    })
+}
+
+const keep = ['\x00', '\x00', '\x00', '\x00', '\x00',
+    '\x00', '\x00', '\x00', '\x00', '\x00',
+    '\x00', '\x00', '\x00', '\x00', '\x00',
+    '\x00', '\x00', '\x00', '\x00', '\x00',
+    "\x00", '\x00', '\x00', '\x00', '\x00',
+    '\x00', '\x00', '\x00', '\x00', '\x00',
+    '\x00', '\x00', '\x00', '\x00'
+]
+
+function keepAlive() {
+    const keys = Object.keys(connections)
+
+    const arr = [{
+        data: serverData.time,
+        type: "long"
+    }]
+
+    const packet = createPacket("04", arr)
+
+    keys.forEach(key => {
+        let conn = connections[key]
+        // console.log(conn.keepaliveid.split(''))
+        conn.socket.write(keep.join(''))
+        conn.socket.write(packet)
+    })
+}
+
+function checkCommand(connection, message) {
+    if (!configuration.allowCommands) return false
+    if (message[0] != "/") return false
+
+    const args = message.split(' ')
+    const command = args.shift()
+
+    // console.log(command, args)
+
+    const data = {
+        command: command,
+        arguments: args,
+        user: {
+            username: connection.socket.username,
+            connection: connection
+        },
+        player: playerManager.getPlayer(connection.socket.username),
+        functions: {
+            directMessage: directMessage,
+            broadcastMessage: broadcastMessage,
+            sendPacket: sendPacket,
+            broadcastPacket: broadcastPacket,
+            reload: () => {
+                configuration = loadconfig()
+            }
+        },
+        server: emitter,
+        connections:connections
+    }
+
+    if (commands.hasOwnProperty(command)) {
+        const c = commands[command]
+
+        const op = c.data.op || false
+
+        if (op && !isTrusted(connection))
+            directMessage(connection, "You're not a trusted player!")
+        else {
+            try {
+                c.execute(data)
+            } catch (err) {
+                directMessage(connection, `§cError executing command ${command}. Check console for details.`)
+                console.error(`Error while executing command ${command}`)
+                console.log(err)
+            }
+        }
+    } else directMessage(connection, "Command not found.")
+
+    return true
+}
+
+function isTrusted(connection) {
+    console.log(JSON.stringify(configuration.trusted))
+    if(!configuration.trusted.hasOwnProperty(connection.username)) return false
+    if(configuration.trusted[connection.username].indexOf(connection.socket.remoteAddress) == -1) return false
+
+    else return true
+}
+
+const {
+    setIntervalAsync,
+    clearIntervalAsync
+} = require('set-interval-async/dynamic')
+
+setInterval(keepAlive, 10000)
+serverTick()
+// setInterval(serverTick, 50)
+
+// setIntervalAsync(serverTick, 50)
