@@ -1,3 +1,4 @@
+const { fstat } = require('fs')
 const zlib = require('zlib'),
     createPacket = require("./createPacket.js"),
     TwosComplementBuffer = require('twos-complement-buffer')
@@ -91,13 +92,13 @@ class Chunk {
         packetID = packetID || chunkPacketID
         const deflatedBlocks = zlib.deflateSync(this.getBlockBytes())
         const arr = this.getArray(deflatedBlocks)
+        const packet = createPacket(packetID, arr)
 
-        return createPacket(packetID, arr)
+        return packet
     }
 
     getArray(deflatedBlocks) {
-        // console.log(deflatedBlocks)
-        return [{
+        var arr = [{
             // Chunk X position
             data: this.position.x,
             type: "tc32bit"
@@ -115,35 +116,50 @@ class Chunk {
             type: "ushort"
         }, {
             // "Add" bitmap
-            data: this.getBitmap(),
+            data: 0,
             type: "ushort"
         }, {
             // Size of compressed chunk data
-            data: this.getBlockBytes().length / 2,
+            data: deflatedBlocks.length,
             type: "int"
         }, {
-            // Compressed chunk data
-            data: this.getBlockBytes(),
-            type: "nop"
+            data: 0,
+            type: "int"
         }]
+
+        // console.log(JSON.stringify(arr))
+
+        const blockBytes = deflatedBlocks
+
+        if (blockBytes.length > 1)
+            arr.push({
+                // Compressed chunk data
+                data: blockBytes,
+                type: "nop"
+            })
+
+        // console.log(deflatedBlocks)
+        return arr
     }
 
     getBitmap() {
-        var binary = new Array(this.height)
-        for (var i = 0; i < this.height; i += 16) {
+        var binary = new Array(this.height / 16)
+        for (var i = 0; i < 16; i++) {
 
-            if (binary[i / 16] == 0)
-                for (var y = i; y < i + 16; ++y) {
-                    for (var x = 0; x < 16; ++x) {
-                        for (var z = 0; z < 16; ++z) {
-                            const thisBlock = this.getBlock(x, y, z)
-
-                            if (Object.keys(thisBlock).length > 0) binary[i / 16] = 1
-                        }
+            // if (binary[i] == 0)
+            binary[i] = 0
+            for (var y = i; y < i + 16; ++y) {
+                for (var x = 0; x < 16; ++x) {
+                    for (var z = 0; z < 16; ++z) {
+                        const thisBlock = this.getBlock(x, y, z)
+                        if (Object.keys(thisBlock).length > 0) binary[i] = 1
                     }
                 }
+            }
         }
 
+        console.log(binary)
+        // console.log(parseInt(binary.join(''), 2))
         return parseInt(binary.join(''), 2)
     }
 

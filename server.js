@@ -357,7 +357,7 @@ function handlePacket(socket, packet, packetID, decoded) {
     if (configuration.useAntiCheat) anticheat(socket)
 }
 
-async function serverTick() {
+function serverTick() {
     const currentTime = Date.now()
     var offset = (currentTime - serverData.lastTick) - 50
 
@@ -392,7 +392,7 @@ async function serverTick() {
     serverData.lastTick = currentTime
 
 
-    setTimeout(serverTick, 50 - offset)
+    setTimeout(serverTick, 50 - (offset + 10))
 }
 
 // chat height is 20 rows.
@@ -521,7 +521,6 @@ function checkCommand(connection, message) {
 }
 
 function isTrusted(connection) {
-    console.log(JSON.stringify(configuration.trusted))
     if(!configuration.trusted.hasOwnProperty(connection.username)) return false
     if(configuration.trusted[connection.username].indexOf(connection.socket.remoteAddress) == -1) return false
 
