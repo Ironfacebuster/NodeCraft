@@ -14,6 +14,7 @@ const filename = "./server data/logs/" + safeTimestamp() + ".txt"
 const {
     config
 } = require('process')
+const { isArray } = require('util')
 
 var fullLog = []
 var chatLog = []
@@ -366,15 +367,19 @@ module.exports.chat = {
 }
 
 console.log = (string) => {
+    if(Array.isArray(string)) string = string.join(' ')
     module.exports.chat.logChat(string, "gray")
 }
 console.warn = (string) => {
+    if(Array.isArray(string)) string = string.join(' ')
     module.exports.chat.logChat(string, "yellow")
 }
 console.error = (string) => {
+    if(Array.isArray(string)) string = string.join(' ')
     module.exports.chat.logChat(string, "red")
 }
 console.append = (string) => {
+    if(Array.isArray(string)) string = string.join(' ')
     module.exports.chat.appendChat(string, "gray")
 }
 

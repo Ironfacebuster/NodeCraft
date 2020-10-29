@@ -1,2 +1,4 @@
 node_modules/
-"poop.js" 
+server data/logs/
+poop.js
+nodemon.json
