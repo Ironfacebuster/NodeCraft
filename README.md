@@ -17,7 +17,7 @@ After performing all of the above steps, you should be ready to run the server.
     * If you're on Windows, you can click empty space in the address bar of Explorer and enter `cmd`. This will open a non-elevated command prompt in the current directory.
 2. Run `node server.js`.
 ### Server Console
-The server console, while relatively bare for now, currently provides various useful information. For the time being, you can see your current CPU usage, RAM heap usage, and Ticks per Second.
+The server console, while relatively bare for now, provides some useful information. For the time being, you can see your current CPU usage, RAM heap usage, and Ticks per Second.
 
 Another important part of the server console is the Chat log. This is where logging ends up, as well as all chat messages. When the console window is selected, you can type to send a message as the Server. You can also scroll the chat log by pressing the `Up` and `Down` arrow keys.
 
