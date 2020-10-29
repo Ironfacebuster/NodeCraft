@@ -2,6 +2,7 @@
 A free to use implementation of the Minecraft Protocol (version 13) for Minecraft Beta 1.6.6
 
 **This is not meant as a drop-in replacement for the official Mojang server.**
+
 If you have little to no coding experience, this is not the server for you.
 
 ## How to Use NodeCraft
