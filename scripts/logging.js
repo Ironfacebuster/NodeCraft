@@ -119,12 +119,16 @@ function start(broadcast) {
         if (key && key.ctrl && key.name == 'c') {
             process.exit();
         } else {
-            // console.log(JSON.stringify(key))
             if (key) {
+                // Increase/decrease the chat log scroll position.
                 if (key.name == "up") chatlogScroll++
                 if (key.name == "down") chatlogScroll--
+
+                // Clamp the chat log scroll position between zero and some weird height calculation.
                 chatlogScroll = Math.max(0, Math.min(chatlogScroll, chatLog.length - Math.ceil(process.stdout.rows / 2) + 3))
             }
+
+            // If the key is RETURN or ENTER and there is input, send the chat message.
             if (key && (key.name == "return" || key.name == "enter") && consoleInput.length > 0) {
                 serverChat(consoleInput.join(''))
                 consoleInput = []
@@ -133,17 +137,23 @@ function start(broadcast) {
 
                 drawText(2, process.stdout.rows - 2, blankLine.substr(0, process.stdout.columns - 2))
             } else if (key && key.sequence == "\b")
+                // If backspace is pressed, remove the last character
                 consoleInput.pop(), typedChar = true
-            else if(ch && ch.replace(/[\r\n]/,"").length > 0)
+            else if (ch && ch.replace(/[\r\n]/, "").length > 0)
+                // If a character is typed, add it to the array.
                 consoleInput.push(ch), typedChar = true
         }
 
         if (typedChar) {
+            // If a character has been typed, pad the end with space characters.
             const mes = consoleInput.join('').toString().replace("\r\n", "")
             var spacer = blankLine.substr(0, (process.stdout.columns - mes.length) - 4)
 
+            // Make sure the blinking cursor is enabled
             blinkOn = true
             blink = "_"
+
+            // Draw the message, blinking cursor, and spacing.
             drawText(2, process.stdout.rows - 2, mes + blink + spacer || "Type to chat.")
         }
     });
@@ -166,8 +176,10 @@ chat = {
 
 function drawOverlay() {
 
+    // Set the console title.
     process.stdout.write(String.fromCharCode(27) + "]0;" + "NodeCraft Server" + String.fromCharCode(7))
 
+    // Draw various UI elements that only have to be drawn once.
     clearArea(0, 1, Math.ceil(process.stdout.columns / 2), Math.ceil(process.stdout.rows / 2) - 1)
     clearArea(Math.ceil(process.stdout.columns / 2), 1, Math.ceil(process.stdout.columns / 2) - 1, Math.ceil(process.stdout.rows / 2) - 1)
     clearArea(0, Math.ceil(process.stdout.rows / 2), process.stdout.columns, process.stdout.rows - 1)
@@ -190,20 +202,24 @@ process.stdout.on('resize', () => {
     applySettings()
     renderLines()
 
+    // Clear the chat log (does not clear internal log)
     chatLog = []
+    // Clearing the chat log is easier than going through the chatlog again, and redividing everything in it
 
+    // Clear the console
     console.clear()
 
+    // Redraw UI elements.
     drawOverlay()
 })
 
 async function interval() {
-    // console.clear()
+    // Fixed interval function the UI is updated at.
 
     osutils.cpuUsage(function (v) {
         cpuUsage = v
     })
-    // applySettings()
+
     drawInfo()
     drawChatLog()
     drawScrollBar(process.stdout.columns - 1, Math.ceil((process.stdout.rows / 2)), 1, (process.stdout.rows / 2) - 2, chatlogScroll, Math.max(0, chatLog.length - Math.ceil(process.stdout.rows / 2) + 3))
@@ -217,15 +233,16 @@ var blinkOn = true
 var blink = "_"
 
 function blinkingCursor() {
+    // Toggle the blinking cursor every 0.5 seconds.
+
     blink = blinkOn ? "_" : " "
-    // var str = consoleInput.join('') + blink
-    // console.log(blink)
 
     blinkOn = !blinkOn
     setTimeout(blinkingCursor, 500)
 }
 
 async function applySettings() {
+    // Apply logging settings
     if (cursor.visible) cursor.show()
     else cursor.hide()
 }
@@ -247,7 +264,7 @@ async function drawInfo() {
     drawBar(1, 5, quarter, ram.heapUsed, ram.heapTotal)
     drawText(quarter + 2, 5, `${Math.ceil((ram.heapUsed / 1048576)*100)/100}/${Math.ceil((ram.heapTotal / 1048576)*100)/100}MB   `)
 
-    const tick = Date.now() - serverData.lastTick
+    // const tick = Date.now() - serverData.lastTick
 
     if (Date.now() - lastCheck >= 1000) {
         tps = serverData.ticks - lastticks
@@ -290,10 +307,6 @@ function renderLines() {
         maxHorizontalLine = maxHorizontalLine + "═"
         blankLine = blankLine + " "
     }
-
-    // for (var i = 0; i < process.stdout.rows; i++) {
-    //     maxVerticalLine = maxVerticalLine + "║"
-    // }
 }
 
 function drawLine(startX, startY, length, isHorizontal) {
@@ -323,7 +336,7 @@ module.exports.drawing = {
 }
 module.exports.chat = {
     logChat: async (message, color, appended) => {
-        if(message.toString().replace(/[\r\n]/g,"").length == 0) return
+        if (message.toString().replace(/[\r\n]/g, "").length == 0) return
 
         if (!appended)
             message = timestamp() + " " + message.toString()
@@ -386,9 +399,12 @@ function divideMessage(message) {
     var arr = []
     message = message.toString()
 
+    // Check if the message is evenly divisible by the console width.
+    // (if the message is too long)
     const num = Math.ceil(message.length / maxWidth)
 
     if (num > 0) {
+        // For however many times the message can be divided, divide the message into chunks.
         for (var i = 0; i < num; i++) {
             arr.push(message.substr(i * maxWidth, maxWidth))
         }
@@ -399,5 +415,6 @@ function divideMessage(message) {
 
 process.on('exit', () => {
     fs.writeFileSync("./server data/logs/" + safeTimestamp() + ".txt", fullLog.join('\r\n'))
+    cursor.show()
     console.clear()
 })
