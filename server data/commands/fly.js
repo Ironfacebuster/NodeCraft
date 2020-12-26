@@ -12,5 +12,5 @@ module.exports.execute = (data) => {
 
     p.data.flags["fly"] = !p.data.flags["fly"]
 
-    data.functions.directMessage(data.user.connection, chatColor.gray(`Flying is now ${chatColor.gold(p.data.flags["fly"] ? "enabled": "disabled")}.`))
+    data.functions.directMessage(chatColor.gray(`Flying is now ${chatColor.gold(p.data.flags["fly"] ? "enabled": "disabled")}.`))
 }

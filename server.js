@@ -22,7 +22,10 @@ serverData = {
     days: 0,
     ticks: 0,
     lastTick: Date.now(),
-    lastTimeUpdate: Date.now()
+    lastTimeUpdate: Date.now(),
+    weather: {
+        isRaining: false
+    }
 }
 
 const server = net.createServer(),
@@ -31,8 +34,8 @@ const server = net.createServer(),
 function loadconfig() {
     emitter.removeAllListeners()
     // console.log("=========================")
-    console.log("Loading properties.txt...")
-    let txt = fs.readFileSync('properties.txt').toString().split('\r\n')
+    console.log("Loading server.properties...")
+    let txt = fs.readFileSync('server.properties').toString().split('\r\n')
     let conf = {}
 
     txt.forEach(c => {
@@ -69,7 +72,6 @@ function loadconfig() {
 
     const setupData = {
         functions: {
-            directMessage: directMessage,
             broadcastMessage: broadcastMessage,
             sendPacket: sendPacket,
             broadcastPacket: broadcastPacket
@@ -129,7 +131,7 @@ function logBuffer(buffer, skipID) {
 }
 
 server.listen(configuration.port, function () {
-    console.log(`Server listening for connection requests on: localhost:${configuration.port}`);
+    console.log(`Server listening for connection requests on port: ${configuration.port}`);
 })
 
 server.on('connection', function (socket) {
@@ -197,10 +199,8 @@ function splitPacket(packet, seperator) {
 function handlePacket(socket, packet, packetID, decoded) {
     // const arr = packet.toString().split('')
     if (packetID == '0x00') {
-        // LOGIN packet
-        // NO IDEA
-        // Documentation of "Pre-release" protocol says this is a login initialize. (ALL OF THE PACKET IDS ARE DIFFERENT ON THERE.)
-        // ^ this documentation isn't for version 13 of the protocol.
+        // Keep Alive
+        // Apparently sends out a "keep alive" ID
 
         // Byte 2 seems to be the position update packet ID (0x0b)
         // It sometimes sends what seems to be a position update. (x:8.5 y:52.998404178607224 stance:54.618404183375596 z:8.5 onground:false)
@@ -265,7 +265,39 @@ function handlePacket(socket, packet, packetID, decoded) {
         }
 
         socket.username = username
-
+        // const packet01response = createPacket("01", [{
+        //         data: 0,
+        //         type: "int"
+        //     },
+        //     {
+        //         data: "",
+        //         type: "string"
+        //     },
+        //     {
+        //         data: "default",
+        //         type: "string"
+        //     },
+        //     {
+        //         data: 0,
+        //         type: "int"
+        //     },
+        //     {
+        //         data: 0,
+        //         type: "int"
+        //     },
+        //     {
+        //         data: 1,
+        //         type: "byte"
+        //     },
+        //     {
+        //         data: 0,
+        //         type: "byte"
+        //     },
+        //     {
+        //         data: 0,
+        //         type: "byte"
+        //     }
+        // ])
         const packet01response = Buffer.from(fs.readFileSync(configuration.worldFolder + "/packet01response.txt").toString(), "hex")
         socket.write(packet01response)
         broadcastMessage(`§e${socket.username} has joined.`)
@@ -391,42 +423,70 @@ function serverTick() {
     serverData.ticks++
     serverData.lastTick = currentTime
 
-
     setTimeout(serverTick, 50 - (offset + 10))
 }
 
 // chat height is 20 rows.
 async function broadcastMessage(message) {
-    const array = [{
-        data: message.toString(),
-        type: "string"
-    }]
+    var messages = divideMessage(message)
 
-    const packet = createPacket("03", array)
+    messages.forEach(m => {
+        const array = [{
+            data: m.toString(),
+            type: "string"
+        }]
 
-    const keys = Object.keys(connections)
+        const packet = createPacket("03", array)
 
-    keys.forEach(key => {
-        let conn = connections[key]
-        if (conn.socket.destroyed == false)
-            conn.socket.write(packet)
+        const keys = Object.keys(connections)
+
+        keys.forEach(key => {
+            let conn = connections[key]
+            if (conn.socket.destroyed == false)
+                conn.socket.write(packet)
+        })
+
+        logging.chat.logChat(m, "white")
     })
-
-    logging.chat.logChat(message, "white")
 }
 
 // chat height is 20 rows.
-async function directMessage(connection, message) {
-    const array = [{
-        data: message.toString(),
-        type: "string"
-    }]
+async function directMessage(connection, message, isCommand) {
+    isCommand = isCommand || false
+    var messages = divideMessage(message)
 
-    const packet = createPacket("03", array)
+    messages.forEach(m => {
+        const array = [{
+            data: m.toString(),
+            type: "string"
+        }]
 
-    connection.socket.write(packet)
+        const packet = createPacket("03", array)
 
-    logging.chat.logChat(message, "white")
+        connection.socket.write(packet)
+
+        if (!isCommand)
+            logging.chat.logChat(m, "white")
+    })
+}
+
+// function copied from logging.js
+function divideMessage(message) {
+    var maxWidth = 119
+
+    var arr = []
+    message = message.toString()
+
+    const num = Math.ceil(message.length / maxWidth)
+
+    if (num > 0) {
+        // For however many times the message can be divided, divide the message into chunks.
+        for (var i = 0; i < num; i++) {
+            arr.push(message.substr(i * maxWidth, maxWidth).trim())
+        }
+    } else arr = [message]
+
+    return arr
 }
 
 function sendPacket(username, buffer) {
@@ -487,7 +547,9 @@ function checkCommand(connection, message) {
         },
         player: playerManager.getPlayer(connection.socket.username),
         functions: {
-            directMessage: directMessage,
+            directMessage: (message) => {
+                directMessage(connection, message, true)
+            },
             broadcastMessage: broadcastMessage,
             sendPacket: sendPacket,
             broadcastPacket: broadcastPacket,
@@ -496,37 +558,41 @@ function checkCommand(connection, message) {
             }
         },
         server: emitter,
-        connections:connections
+        connections: connections
     }
 
+    console.log(`${connection.socket.username} executed ${message}`)
     if (commands.hasOwnProperty(command)) {
         const c = commands[command]
 
         const op = c.data.op || false
 
         if (op && !isTrusted(connection))
-            directMessage(connection, "You're not a trusted player!")
+            directMessage(connection, "You're not a trusted player!", true)
         else {
             try {
                 c.execute(data)
             } catch (err) {
-                directMessage(connection, `§cError executing command ${command}. Check console for details.`)
+                directMessage(connection, `§cError executing command ${command}. Check console for details.`, true)
                 console.error(`Error while executing command ${command}`)
                 console.log(err)
             }
         }
-    } else directMessage(connection, "Command not found.")
+    } else directMessage(connection, "Command not found.", true)
 
     return true
 }
 
 function isTrusted(connection) {
-    if(!configuration.trusted.hasOwnProperty(connection.username)) return false
-    if(configuration.trusted[connection.username].indexOf(connection.socket.remoteAddress) == -1) return false
+    if (!configuration.trusted.hasOwnProperty(connection.username)) return false
+    if (configuration.trusted[connection.username].indexOf(connection.socket.remoteAddress) == -1) return false
 
     else return true
 }
 
+const {
+    connect
+} = require('http2')
 const {
     setIntervalAsync,
     clearIntervalAsync

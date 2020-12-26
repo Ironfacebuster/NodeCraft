@@ -14,8 +14,8 @@ function checkMovement(socket) {
     const moveDistance = distance2D(player.position, playerCheck.lastCheck.movement.position),
         fallDistance = distance1D(player.position.y, playerCheck.lastCheck.movement.position.y)
 
-    const moveSpeed = moveDistance * (1000 / timeDifference),
-        fallSpeed = fallDistance * (1000 / timeDifference)
+    const moveSpeed = moveDistance / (timeDifference / 1000),
+        fallSpeed = fallDistance / (timeDifference / 1000)
 
     // if (moveSpeed >= 10) console.log(`${username} moved ${moveSpeed} m/s in ${timeDifference} ms!`)
 
@@ -25,7 +25,7 @@ function checkMovement(socket) {
     //     if (playerCheck.hackedClient % 10 == 0) console.log(`${username} is sending packets too fast! (${timeDifference} ms since last packet)`)
     // }
 
-    if ((moveSpeed >= 4.32 && timeDifference <= 45) || moveSpeed >= 5) {
+    if ((moveSpeed >= 5 && timeDifference <= 45) || moveSpeed >= 5) {
         playerCheck.fastMovement++
         playerCheck.hackedClient++
 
@@ -67,9 +67,11 @@ function checkBreak(username, breakPosition) {
     const player = playerManager.getPlayer(username)
     const playerCheck = getPlayerChance(username)
 
-    const distance = distance(player.position, breakPosition)
+    const d = distance(player.position, breakPosition)
 
+    if (d > 6) distanceBreak += d / 6
 
+    updatePlayerChance(playerCheck, socket)
 }
 
 function getPlayerChance(username) {
@@ -123,11 +125,12 @@ function updatePlayerChance(playerCheck, socket) {
     if (playerCheck.fakeCrouch >= 10) playerCheck.flags.fakecrouch = true
     if (playerCheck.flying >= 10) playerCheck.flags.flyhacking = true
     if (playerCheck.hackedClient >= 30) playerCheck.flags.hackedClient = true
+    if (playerCheck.distanceBreak >= 5) playerCheck.flags.hackedClient = true
 
-    if (playerCheck.flags.speedhack) kickUser(socket, "Moving too fast.")
+    if (playerCheck.flags.speedhack) kickUser(socket, "Speedhacking.")
     else if (playerCheck.flags.fakecrouch) kickUser(socket, "False Crouching.")
-    // else if (playerCheck.flags.flyhacking) kickUser(socket, "Flying.")
-    else if (playerCheck.flags.hackedClient) kickUser(socket, "Sending packets too quickly.")
+    // // else if (playerCheck.flags.flyhacking) kickUser(socket, "Flying.")
+    else if (playerCheck.flags.hackedClient) kickUser(socket, "Other Cheating.")
 
     if (time - playerCheck.lastCheck.update.time >= 500) {
         playerCheck.fastMovement = 0

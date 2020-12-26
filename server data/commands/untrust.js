@@ -14,13 +14,13 @@ module.exports.execute = (data) => {
         username = data.arguments[0]
 
     if (!username || username.length == 0)
-        return data.functions.directMessage(connection, chatColor.red(`A username is required for this command!`))
+        return data.functions.directMessage(chatColor.red(`A username is required for this command!`))
     if (!configuration.trusted.hasOwnProperty(username))
-        return data.functions.directMessage(connection, chatColor.red(`${username} is not a trusted player!`))
+        return data.functions.directMessage(chatColor.red(`${username} is not a trusted player!`))
 
     delete(configuration.trusted[username])
 
     fs.writeFile(configuration.trusts, JSON.stringify(configuration.trusted), () => {
-        data.functions.directMessage(connection, `${username} has been untrusted.`)
+        data.functions.directMessage(`${username} has been untrusted.`)
     })
 }

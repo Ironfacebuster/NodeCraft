@@ -29,12 +29,12 @@ module.exports.execute = (data) => {
             sendTime(Math.min(24000, Math.max(0, time)), data)
         } else {
             // If time is a word
-            if (!times.hasOwnProperty(time)) return data.functions.directMessage(data.user.connection, chatColor.red(`"${time}" is not a valid time!`))
+            if (!times.hasOwnProperty(time)) return data.functions.directMessage(chatColor.red(`"${time}" is not a valid time!`))
 
             sendTime(times[time], data)
         }
     } else if (comm == "get") {
-        data.functions.directMessage(data.user.connection, chatColor.gray(`The time is: ${chatColor.gold(serverData.time)} `) + chatColor.gray(`ticks, day ${chatColor.gold(serverData.days)}`))
+        data.functions.directMessage(chatColor.gray(`The time is: ${chatColor.gold(serverData.time)} `) + chatColor.gray(`ticks, day ${chatColor.gold(serverData.days)}`))
     }
 }
 

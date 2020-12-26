@@ -29,7 +29,7 @@ module.exports.execute = (data) => {
         id = Math.min(2257, Math.max(1, data.arguments[2])) || 1,
         count = Math.min(64, Math.max(0, data.arguments[3])) || 64
 
-    if (!sections.hasOwnProperty(inv)) return data.functions.directMessage(data.user.connection, chatColor.red(`Invalid parameter for {inventory section}`))
+    if (!sections.hasOwnProperty(inv)) return data.functions.directMessage(chatColor.red(`Invalid parameter for {inventory section}`))
 
     const arr = [{
         data: ["0x00", "0x00", `0x${Math.min(44, Math.max(sections[inv] + slot, 0)).toString(16).padStart(2,0)}`],
@@ -57,7 +57,7 @@ module.exports.execute = (data) => {
     // data.user.connection.socket.write(packet)
 
     data.player.setInventorySlot(data.arguments[0], data.arguments[1], data.arguments[1], data.arguments[2])
-    data.functions.directMessage(data.user.connection, `Setting slot ${slot} of ${inv} to be ${count} of ID ${id}.`)
+    data.functions.directMessage(`Setting slot ${slot} of ${inv} to be ${count} of ID ${id}.`)
 }
 
 // 66 - ID 

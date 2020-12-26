@@ -23,8 +23,8 @@ module.exports.data = {
 
 // REQUIRED
 module.exports.execute = (data) => {
-    data.functions.directMessage(data.user.connection, `${chatColor.aqua("Temp command.")}`)
-    data.functions.directMessage(data.user.connection, "This command is for testing server events.")
+    data.functions.directMessage(`${chatColor.aqua("Temp command.")}`)
+    data.functions.directMessage("This command is for testing server events.")
 }
 
 var randomValue = 0

@@ -23,12 +23,23 @@ for (var y = 16; y < 17; y++) {
     }
 }
 
-const b = new Block(1, 0, -32, 18, 0)
-tempChunk.setBlock(x, y, z, b)
+// const b = new Block(1, 0, -32, 18, 0)
+// tempChunk.setBlock(x, y, z, b)
 
 const fs = require('fs')
 
 var chunkBuffer1
+var chunkAllocate = createPacket('32', [{
+    data: -32,
+    type: "int"
+}, {
+    data: 0,
+    type: "int"
+}, {
+    data: true,
+    type: "boolean"
+}])
+// console.log(chunkAllocate)
 
 tempChunk.toPacket((data) => {
     // console.log(data)
@@ -45,7 +56,9 @@ module.exports.execute = (data) => {
     const arg = data.arguments ? data.arguments[0] : "0"
 
     if (arg == "1") {
-        data.functions.directMessage(data.user.connection, "Sending a server generated chunk. " + chatColor.gray(`(${chunkBuffer1.byteLength} bytes.)`))
+        data.functions.directMessage("Allocating chunk. " + chatColor.gray(`(${chunkAllocate.byteLength} bytes.)`))
+        data.user.connection.socket.write(chunkAllocate)
+        data.functions.directMessage("Requesting a server generated chunk. " + chatColor.gray(`(${chunkBuffer1.byteLength} bytes.)`))
         data.user.connection.socket.write(chunkBuffer1)
         data.user.connection.socket.write(createPacket('0b', [{
             data: data.player.position.x,
@@ -64,7 +77,8 @@ module.exports.execute = (data) => {
             type: "boolean"
         }]))
     } else if (arg == "reload") {
-        data.functions.directMessage(data.user.connection, "Reloading tempchunk...")
+        data.functions.directMessage("Reloading tempchunk...")
+        console.log(chunkBuffer1)
         chunkBuffer2 = Buffer.from(fs.readFileSync(configuration.worldFolder + "/tempchunk.txt").toString(), "hex")
     } else {
         data.user.connection.socket.write(chunkBuffer2)

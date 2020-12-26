@@ -12,5 +12,5 @@ module.exports.execute = (data) => {
     data.functions.broadcastMessage("Reloading server files...")
     data.functions.reload()
     data.functions.broadcastMessage("Reload finished. " + chatColor.gray(`(Took ${Date.now()-startTime}ms)`))
-    // data.functions.directMessage(data.user.connection, ))
+    // data.functions.directMessage())
 }

@@ -1,4 +1,5 @@
 const chalk = require('chalk'),
+    stripAnsi = require('strip-ansi'),
     {
         clear
     } = require('console'),
@@ -14,7 +15,9 @@ const filename = "./server data/logs/" + safeTimestamp() + ".txt"
 const {
     config
 } = require('process')
-const { isArray } = require('util')
+const {
+    isArray
+} = require('util')
 
 var fullLog = []
 var chatLog = []
@@ -26,11 +29,11 @@ var cursor = {
     },
     visible: false,
     hide: () => {
-        process.stderr.write('\x1B[?25l');
+        process.stderr.write('\x1B[?25l')
         cursor.visible = false
     },
     show: () => {
-        process.stderr.write('\x1B[?25h');
+        process.stderr.write('\x1B[?25h')
         cursor.visible = true
     }
 }
@@ -47,7 +50,7 @@ function setCursorPosition(x, y) {
 
 }
 
-function drawBar(x, y, width, value, max) {
+async function drawBar(x, y, width, value, max) {
     setCursorPosition(x, y)
 
     var per = value / max,
@@ -59,9 +62,12 @@ function drawBar(x, y, width, value, max) {
     }
 }
 
-function drawScrollBar(x, y, width, height, scroll, max, inverted) {
+async function drawScrollBar(x, y, width, height, scroll, max, inverted) {
     const no = "░",
         yes = "██████"
+
+    const splittop = "▄",
+        splitbot = "▀"
 
     inverted = inverted || true
 
@@ -77,7 +83,7 @@ function drawScrollBar(x, y, width, height, scroll, max, inverted) {
     }
 }
 
-function clearArea(x, y, width, height) {
+async function clearArea(x, y, width, height) {
     const w = blankLine.substr(0, width - 2)
     // setCursorPosition(x,y)
 
@@ -87,7 +93,7 @@ function clearArea(x, y, width, height) {
     }
 }
 
-function drawText(x, y, string) {
+async function drawText(x, y, string) {
     string = string.toString() || "undefined"
 
     setCursorPosition(x, y)
@@ -127,6 +133,7 @@ function start(broadcast) {
 
                 // Clamp the chat log scroll position between zero and some weird height calculation.
                 chatlogScroll = Math.max(0, Math.min(chatlogScroll, chatLog.length - Math.ceil(process.stdout.rows / 2) + 3))
+                drawChatLog()
             }
 
             // If the key is RETURN or ENTER and there is input, send the chat message.
@@ -137,6 +144,7 @@ function start(broadcast) {
                 fullLog.push(consoleInput.join(''))
 
                 drawText(2, process.stdout.rows - 2, blankLine.substr(0, process.stdout.columns - 2))
+                drawChatLog()
             } else if (key && key.sequence == "\b")
                 // If backspace is pressed, remove the last character
                 consoleInput.pop(), typedChar = true
@@ -157,17 +165,18 @@ function start(broadcast) {
             // Draw the message, blinking cursor, and spacing.
             drawText(2, process.stdout.rows - 2, mes + blink + spacer || "Type to chat.")
         }
-    });
+    })
 
-    process.stdin.setRawMode(true);
-    process.stdin.resume();
+    process.stdin.setRawMode(true)
+    process.stdin.resume()
 
     console.warn("NOTICE: logs are only saved if the server exits gracefully!")
 
     started = true
 }
 
-function serverChat(message) {
+async function serverChat(message) {
+    drawOverlay(true)
     chat.broadcast(configuration.serverPrefix + message)
 }
 
@@ -175,15 +184,17 @@ chat = {
     broadcast: null
 }
 
-function drawOverlay() {
+function drawOverlay(noclear) {
 
     // Set the console title.
     process.stdout.write(String.fromCharCode(27) + "]0;" + "NodeCraft Server" + String.fromCharCode(7))
 
     // Draw various UI elements that only have to be drawn once.
-    clearArea(0, 1, Math.ceil(process.stdout.columns / 2), Math.ceil(process.stdout.rows / 2) - 1)
-    clearArea(Math.ceil(process.stdout.columns / 2), 1, Math.ceil(process.stdout.columns / 2) - 1, Math.ceil(process.stdout.rows / 2) - 1)
-    clearArea(0, Math.ceil(process.stdout.rows / 2), process.stdout.columns, process.stdout.rows - 1)
+    if (!noclear) {
+        clearArea(0, 1, Math.ceil(process.stdout.columns / 2), Math.ceil(process.stdout.rows / 2) - 1)
+        clearArea(Math.ceil(process.stdout.columns / 2), 1, Math.ceil(process.stdout.columns / 2) - 1, Math.ceil(process.stdout.rows / 2) - 1)
+        clearArea(0, Math.ceil(process.stdout.rows / 2), process.stdout.columns, process.stdout.rows - 1)
+    }
     drawLine(0, 0, process.stdout.columns, true)
     drawText(2, 0, " Server Information ")
     drawLine(0, Math.ceil(process.stdout.rows / 2) - 1, process.stdout.columns, true)
@@ -222,7 +233,7 @@ async function interval() {
     })
 
     drawInfo()
-    drawChatLog()
+    // drawChatLog()
     drawScrollBar(process.stdout.columns - 1, Math.ceil((process.stdout.rows / 2)), 1, (process.stdout.rows / 2) - 2, chatlogScroll, Math.max(0, chatLog.length - Math.ceil(process.stdout.rows / 2) + 3))
 
     drawText(1, process.stdout.rows - 2, ">")
@@ -251,7 +262,9 @@ async function applySettings() {
 var lastCheck = Date.now()
 var lastticks = 0
 var tps = 0
-var cpuUsage = 0;
+var totalTps = 0
+var checks = 0
+var cpuUsage = 0
 async function drawInfo() {
     const ram = process.memoryUsage()
 
@@ -261,21 +274,30 @@ async function drawInfo() {
     drawBar(1, 2, quarter, cpuUsage, 100)
     drawText(quarter + 2, 2, `${Math.ceil(cpuUsage*100)/100}%   `)
 
-    drawText(1, 4, "RAM Heap")
+    drawText(1, 4, "RAM Heap Usage")
     drawBar(1, 5, quarter, ram.heapUsed, ram.heapTotal)
-    drawText(quarter + 2, 5, `${Math.ceil((ram.heapUsed / 1048576)*100)/100}/${Math.ceil((ram.heapTotal / 1048576)*100)/100}MB   `)
+    drawText(quarter + 2, 5, `${padDecimal(Math.ceil((ram.heapUsed / 1048576)*100)/100,2,0)}/${padDecimal(Math.ceil((ram.heapTotal / 1048576)*100)/100,2,0)}MB   `)
 
     // const tick = Date.now() - serverData.lastTick
 
     if (Date.now() - lastCheck >= 1000) {
         tps = serverData.ticks - lastticks
         lastticks = serverData.ticks
+        totalTps += tps
+        // avgTPS = Math.round(((avgTPS + tps) / 2) * 100) / 100
+        checks++
         lastCheck = Date.now()
     }
 
     drawText(1, 7, "Tick Per Second")
     drawBar(1, 8, quarter, tps, 40)
-    drawText(quarter + 2, 8, `${tps}tps`)
+    drawText(quarter + 2, 8, `${tps}tps   `)
+
+    var avgTPS = Math.round((totalTps / checks) * 100) / 100
+
+    drawText(1, 10, "Average TPS")
+    drawBar(1, 11, quarter, avgTPS, 40)
+    drawText(quarter + 2, 11, `${padDecimal(avgTPS || 0,2,0)}tps   `)
 }
 
 async function drawChatLog() {
@@ -286,6 +308,7 @@ async function drawChatLog() {
         var color = "white"
         // var str = chalk.white("║")
         var message = blankLine.substr(0, blankLine.length - 2)
+        var unformatted = blankLine.substr(0, blankLine.length - 2)
 
         const index = chatLog.length - halfheight + i + 3 - chatlogScroll
         if (index >= 0)
@@ -293,9 +316,10 @@ async function drawChatLog() {
                 const chat = chatLog[index]
                 color = chat.color
                 message = chat.message
+                unformatted = stripAnsi(chat.message)
             }
 
-        drawText(0, halfheight + i, "║" + chalk.keyword(color)(message + blankLine.substr(0, (process.stdout.columns - message.length) - 2)))
+        drawText(0, halfheight + i, "║" + chalk.keyword(color)(message + blankLine.substr(0, (process.stdout.columns - unformatted.length) - 2)))
     }
 }
 
@@ -349,6 +373,10 @@ module.exports.chat = {
                 color: color
             })
         })
+
+        if (chatlogScroll != 0) chatlogScroll++
+
+        drawChatLog()
     },
     appendChat: async (append, color, addSpace) => {
         fullLog.pop()
@@ -363,23 +391,24 @@ module.exports.chat = {
     },
     clear: async () => {
         chatLog = []
+        drawChatLog()
     }
 }
 
 console.log = (string) => {
-    if(Array.isArray(string)) string = string.join(' ')
+    if (Array.isArray(string)) string = string.join(' ')
     module.exports.chat.logChat(string, "gray")
 }
 console.warn = (string) => {
-    if(Array.isArray(string)) string = string.join(' ')
+    if (Array.isArray(string)) string = string.join(' ')
     module.exports.chat.logChat(string, "yellow")
 }
 console.error = (string) => {
-    if(Array.isArray(string)) string = string.join(' ')
+    if (Array.isArray(string)) string = string.join(' ')
     module.exports.chat.logChat(string, "red")
 }
 console.append = (string) => {
-    if(Array.isArray(string)) string = string.join(' ')
+    if (Array.isArray(string)) string = string.join(' ')
     module.exports.chat.appendChat(string, "gray")
 }
 
@@ -411,11 +440,45 @@ function divideMessage(message) {
     if (num > 0) {
         // For however many times the message can be divided, divide the message into chunks.
         for (var i = 0; i < num; i++) {
-            arr.push(message.substr(i * maxWidth, maxWidth))
+            arr.push(colorLog(message.substr(i * maxWidth, maxWidth)))
         }
-    } else arr = [message]
+    } else arr = [colorLog(message)]
 
     return arr
+}
+
+const code = {
+    "§4": chalk.hex("AA0000"),
+    "§c": chalk.hex("FF5555"),
+    "§6": chalk.hex("FFAA00"),
+    "§e": chalk.hex("FFFF55"),
+    "§2": chalk.hex("00AA00"),
+    "§a": chalk.hex("55FF55"),
+    "§b": chalk.hex("55FFFF"),
+    "§3": chalk.hex("00AAAA"),
+    "§1": chalk.hex("0000AA"),
+    "§9": chalk.hex("5555FF"),
+    "§d": chalk.hex("FF55FF"),
+    "§5": chalk.hex("AA00AA"),
+    "§f": chalk.white,
+    "§7": chalk.hex("AAAAAA"),
+    "§8": chalk.hex("555555"),
+    "§0": chalk.black,
+    "§r": (n) => {
+        return n
+    }
+}
+
+function colorLog(message) {
+    var recomp = ""
+    const split = message.split("§")
+    split.forEach(m => {
+        const funct = code[`§${m[0]}`]
+        var n = m
+        if (funct) n = funct(m.substr(1, m.length))
+        recomp = recomp + n
+    })
+    return recomp
 }
 
 process.on('exit', () => {
@@ -423,3 +486,10 @@ process.on('exit', () => {
     cursor.show()
     console.clear()
 })
+
+function padDecimal(number, length, padding) {
+    const parts = number.toString().split(".")
+    if (parts.length == 1) parts.push("0")
+    while (parts[1].length < length) parts[1] = parts[1] + padding
+    return parts.join('.')
+}

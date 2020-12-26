@@ -1,7 +1,8 @@
 const convert = require('./convertVar.js'),
     tcb = require('twos-complement-buffer').TwosComplementBuffer
 
-const tcbParser = new tcb(32)
+const tcbParser = new tcb(32),
+    signedShortParser = new tcb(16)
 
 /**
  * @param {any} data - Any value.
@@ -23,7 +24,12 @@ module.exports = function (data, type, toHex) {
             case 'int':
                 return splitIntoBytes(data.toString(16).padStart(8, '0'))
             case 'ushort':
+                // return [data.toString(16).padStart(2, '0')]
                 return [ushorttohex(data)]
+            case 'short':
+                var b = []
+                signedShortParser.pack(b, parseInt(data))
+                return b
             case 'long':
                 return splitIntoBytes(data.toString(16).padStart(16, '0'))
             case 'boolean':
@@ -42,6 +48,8 @@ module.exports = function (data, type, toHex) {
                 var buf = []
                 tcbParser.pack(buf, parseFloat(data))
                 return buf
+            default:
+                throw new Error("Type not recognized!")
         }
     } else {
         switch (type) {
@@ -63,6 +71,8 @@ module.exports = function (data, type, toHex) {
                 return bool(data)
             case 'double':
                 return convert.hexToDouble(data)
+            default:
+                throw new Error("Type not recognized!")
         }
     }
 }
@@ -76,7 +86,8 @@ function splitIntoBytes(string) {
 }
 
 function ushorttohex(data) {
-    return (Math.min(65535, Math.max(parseInt(data), 0)).toString(16).padStart(4, "0"))
+    const val = (Math.min(65535, Math.max(parseInt(data), 0)).toString(16).padStart(2, "0"))
+    return val
 }
 
 function stringtohex(string) {

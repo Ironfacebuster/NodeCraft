@@ -1,9 +1,11 @@
-const { fstat } = require('fs')
+const {
+    fstat
+} = require('fs')
 const zlib = require('zlib'),
     createPacket = require("./createPacket.js"),
     TwosComplementBuffer = require('twos-complement-buffer')
 
-const chunkPacketID = "1f"
+const chunkPacketID = "33"
 
 class Chunk {
     position = {
@@ -54,15 +56,38 @@ class Chunk {
     }
 
     getBlockBytes() {
-        var bytes = []
-        this.blocks.forEach(blockArray => {
-            // console.log(typeof block)
-            blockArray.forEach(block => {
-                if (Object.keys(block).length > 0)
-                    bytes.push(block.bytes)
+        var type = [],
+            metadata = [],
+            light = [],
+            sky = [],
+            add = [],
+            biome = []
+
+        // presetting biome array
+        for (var i = 0; i < 256; i++) {
+            biome.push("00")
+        }
+
+        this.blocks.forEach(section => {
+            section.forEach(block => {
+                if (Object.keys(block).length > 0) {
+                    const b = block.bytes;
+                    type.push(b.id)
+                    metadata.push(b.metadata)
+                    light.push("F")
+                    sky.push("F")
+                    add.push("0")
+                    // biome.push("00")
+                }
             })
         })
-        return Buffer.from(bytes, "hex")
+
+        var final = type.concat(metadata, light, sky, add)
+        if (this.isGroundUp()) final.concat(biome)
+
+        const buff = Buffer.from(final, "hex")
+
+        return buff
     }
 
     getSlice(y) {
@@ -73,13 +98,13 @@ class Chunk {
      * @param {function callback(data)} callback - Callback function, called when completed.
      * @param {string} packetID - (Optional) Single byte packet ID
      */
-    toPacket(callback, packetID) {
-        packetID = packetID || chunkPacketID
+    toPacket(callback) {
+        // packetID = packetID || chunkPacketID
 
         zlib.deflate(this.getBlockBytes(), (err, res) => {
             const arr = this.getArray(res)
 
-            const buffer = createPacket(packetID, arr)
+            const buffer = createPacket(chunkPacketID, arr)
 
             callback(buffer)
         })
@@ -88,11 +113,11 @@ class Chunk {
     /**
      * @param {string} packetID - (Optional) Single byte packet ID
      */
-    toPacketSync(packetID) {
-        packetID = packetID || chunkPacketID
+    toPacketSync() {
+        // packetID = packetID || chunkPacketID
         const deflatedBlocks = zlib.deflateSync(this.getBlockBytes())
         const arr = this.getArray(deflatedBlocks)
-        const packet = createPacket(packetID, arr)
+        const packet = createPacket(chunkPacketID, arr)
 
         return packet
     }
@@ -190,6 +215,7 @@ Buffer.prototype.toArray = function () {
 class Block {
     metadata = 0
     id = 0
+    isAir = false
     position = {
         local: {
             x: 0,
@@ -216,6 +242,8 @@ class Block {
         z = Math.round(z) || 0
 
         this.setID(id)
+        if (id == 0) isAir = true
+
         this.setMetadata(metadata)
 
         const position = {
@@ -286,9 +314,23 @@ class Block {
             z = this.position.local.z.toString(16),
             x = this.position.local.x.toString(16)
 
-        var b = metadata + id + y + z + x
-        return b.padStart(8, '0')
+        return {
+            id: id,
+            metadata: metadata,
+            position: {
+                x: x,
+                y: y,
+                z: z
+            }
+        }
+
+        // var b = metadata + id + y + z + x
+        // return b.padStart(8, '0')
     }
+
+    // get bytes() {
+
+    // }
 }
 
 module.exports.Chunk = Chunk

@@ -14,9 +14,9 @@ module.exports.execute = (data) => {
         username = data.arguments[0]
 
     if (!username || username.length == 0)
-        return data.functions.directMessage(connection, chatColor.red(`A username is required for this command!`))
+        return data.functions.directMessage(chatColor.red(`A username is required for this command!`))
     if (!playerManager.playerExists(username))
-        return data.functions.directMessage(connection, chatColor.red(`${username} is not an online player!`))
+        return data.functions.directMessage(chatColor.red(`${username} is not an online player!`))
 
     var keys = Object.keys(data.connections)
 
@@ -26,7 +26,7 @@ module.exports.execute = (data) => {
 
         if (conn.username != username) return
         if (configuration.trusted.hasOwnProperty(username) && configuration.trusted[username].indexOf(ip) >= 0)
-            return data.functions.directMessage(connection, chatColor.red(`${username} is already trusted on this IP address!`))
+            return data.functions.directMessage(chatColor.red(`${username} is already trusted on this IP address!`))
 
         // configuration.trusted.push(ip)
         if (configuration.trusted.hasOwnProperty(username))
@@ -35,7 +35,7 @@ module.exports.execute = (data) => {
             configuration.trusted[username] = [ip]
 
         fs.writeFile(configuration.trusts, JSON.stringify(configuration.trusted), () => {
-            data.functions.directMessage(connection, `${username} is now trusted on their current IP address.`)
+            data.functions.directMessage(`${username} is now trusted on their current IP address.`)
         })
     })
 }

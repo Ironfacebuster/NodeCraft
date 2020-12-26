@@ -17,7 +17,7 @@ module.exports.execute = (data) => {
             y = (parseFloat(args[1]) || 0) + 1.6,
             z = parseFloat(args[2]) || 0
 
-        data.functions.directMessage(data.user.connection, chatColor.gray(`Teleporting you to ${chatColor.gold(`${x} ${y} ${z}`)}`))
+        data.functions.directMessage(chatColor.gray(`Teleporting you to ${chatColor.gold(`${x} ${y} ${z}`)}`))
 
         data.user.connection.socket.write(createPacket('0b', [{
             data: x,
@@ -36,27 +36,31 @@ module.exports.execute = (data) => {
             type: "boolean"
         }]))
     } else {
-        if (playerManager.playerExists(args[0])) {
-            const player = playerManager.getPlayer(args[0])
+        const username = args[0]
+        if (!username || username.length == 0)
+            return data.functions.directMessage(chatColor.red(`A username is required for this command!`))
+        if (!playerManager.playerExists(username))
+            return data.functions.directMessage(chatColor.red(`${username} is not an online player!`))
 
-            data.user.connection.socket.write(createPacket('0b', [{
-                data: player.position.x,
-                type: "double"
-            }, {
-                data: player.position.stance,
-                type: "double"
-            }, {
-                data: player.position.y,
-                type: "double"
-            }, {
-                data: player.position.z,
-                type: "double"
-            }, {
-                data: false,
-                type: "boolean"
-            }]))
+        const player = playerManager.getPlayer(username)
 
-            data.functions.directMessage(data.user.connection, chatColor.gray(`Teleporting you to ${chatColor.gold(args[0])}`))
-        } else data.functions.directMessage(data.user.connection, chatColor.red(`${args[0]} is not an online player!`))
+        data.user.connection.socket.write(createPacket('0b', [{
+            data: player.position.x,
+            type: "double"
+        }, {
+            data: player.position.stance,
+            type: "double"
+        }, {
+            data: player.position.y,
+            type: "double"
+        }, {
+            data: player.position.z,
+            type: "double"
+        }, {
+            data: false,
+            type: "boolean"
+        }]))
+
+        data.functions.directMessage(chatColor.gray(`Teleporting you to ${chatColor.gold(username)}`))
     }
 }
