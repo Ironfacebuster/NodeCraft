@@ -63,7 +63,7 @@ async function drawBar(x, y, width, value, max) {
 }
 
 async function drawScrollBar(x, y, width, height, scroll, max, inverted) {
-    const no = "░",
+    const no = "▒",
         yes = "██████"
 
     const splittop = "▄",
@@ -145,7 +145,7 @@ function start(broadcast) {
 
                 drawText(2, process.stdout.rows - 2, blankLine.substr(0, process.stdout.columns - 2))
                 drawChatLog()
-            } else if (key && key.sequence == "\b")
+            } else if (key && (key.sequence == "\b" || key.name == "backspace"))
                 // If backspace is pressed, remove the last character
                 consoleInput.pop(), typedChar = true
             else if (ch && ch.replace(/[\r\n]/, "").length > 0)
@@ -175,8 +175,27 @@ function start(broadcast) {
     started = true
 }
 
+const decodePacket = require("./decodePacket")
+
+var checkCommand
 async function serverChat(message) {
+    const serverConnection = {
+        isServer: true,
+        socket: {
+            username: "§bServer§r",
+            write: (packet) => {
+                const mes = decodePacket(packet, packet).data.text
+                console.log(mes)
+                // module.exports.chat.logChat(mes)
+            }
+        }
+    }
+
     drawOverlay(true)
+    if (checkCommand(serverConnection, message)) {
+
+        return
+    }
     chat.broadcast(configuration.serverPrefix + message)
 }
 
@@ -272,11 +291,11 @@ async function drawInfo() {
 
     drawText(1, 1, "CPU Usage")
     drawBar(1, 2, quarter, cpuUsage, 100)
-    drawText(quarter + 2, 2, `${Math.ceil(cpuUsage*100)/100}%   `)
+    drawText(quarter + 2, 2, `${Math.ceil(cpuUsage * 100) / 100}%   `)
 
     drawText(1, 4, "RAM Heap Usage")
     drawBar(1, 5, quarter, ram.heapUsed, ram.heapTotal)
-    drawText(quarter + 2, 5, `${padDecimal(Math.ceil((ram.heapUsed / 1048576)*100)/100,2,0)}/${padDecimal(Math.ceil((ram.heapTotal / 1048576)*100)/100,2,0)}MB   `)
+    drawText(quarter + 2, 5, `${padDecimal(Math.ceil((ram.heapUsed / 1048576) * 100) / 100, 2, 0)}/${padDecimal(Math.ceil((ram.heapTotal / 1048576) * 100) / 100, 2, 0)}MB   `)
 
     // const tick = Date.now() - serverData.lastTick
 
@@ -297,7 +316,7 @@ async function drawInfo() {
 
     drawText(1, 10, "Average TPS")
     drawBar(1, 11, quarter, avgTPS, 40)
-    drawText(quarter + 2, 11, `${padDecimal(avgTPS || 0,2,0)}tps   `)
+    drawText(quarter + 2, 11, `${padDecimal(avgTPS || 0, 2, 0)}tps   `)
 }
 
 async function drawChatLog() {
@@ -394,6 +413,9 @@ module.exports.chat = {
         drawChatLog()
     }
 }
+module.exports.setCheckCommand = (funct) => {
+    checkCommand = funct
+}
 
 console.log = (string) => {
     if (Array.isArray(string)) string = string.join(' ')
@@ -414,8 +436,8 @@ console.append = (string) => {
 
 function timestamp() {
     const d = new Date().toISOString().
-    replace(/T/, ' '). // replace T with a space
-    replace(/\..+/, '') // delete the dot and everything after
+        replace(/T/, ' '). // replace T with a space
+        replace(/\..+/, '') // delete the dot and everything after
 
     return "(" + d + ")"
 }
@@ -440,7 +462,7 @@ function divideMessage(message) {
     if (num > 0) {
         // For however many times the message can be divided, divide the message into chunks.
         for (var i = 0; i < num; i++) {
-            arr.push(colorLog(message.substr(i * maxWidth, maxWidth)))
+            arr.push(colorLog(message.substr(i * maxWidth, maxWidth).trim()))
         }
     } else arr = [colorLog(message)]
 
@@ -471,11 +493,16 @@ const code = {
 
 function colorLog(message) {
     var recomp = ""
-    const split = message.split("§")
+
+    const split = message.split(/[�§]/g)
+    recomp = recomp + split.shift()
+
     split.forEach(m => {
         const funct = code[`§${m[0]}`]
+        m = m.substr(1, m.length)
         var n = m
-        if (funct) n = funct(m.substr(1, m.length))
+
+        if (funct) n = funct(m)
         recomp = recomp + n
     })
     return recomp
