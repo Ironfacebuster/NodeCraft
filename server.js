@@ -35,7 +35,8 @@ function loadconfig() {
     emitter.removeAllListeners()
     // console.log("=========================")
     console.log("Loading server.properties...")
-    let txt = fs.readFileSync('server.properties').toString().split('\r\n')
+    const prop = fs.readFileSync('./server.properties').toString()
+    let txt = prop.split(/[\r\n]/g)
     let conf = {}
 
     txt.forEach(c => {
@@ -162,7 +163,7 @@ server.on('connection', function (socket) {
     // When the client requests to end the TCP connection with the server, the server
     // ends the connection.
     socket.on('end', function () {
-        delete(connections[socket.id])
+        delete (connections[socket.id])
         playerManager.removePlayer(socket.username)
 
         if (socket.username && socket.destroyed == false)
