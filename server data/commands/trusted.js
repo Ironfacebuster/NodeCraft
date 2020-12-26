@@ -6,6 +6,6 @@ module.exports.data = {
 }
 
 module.exports.execute = (data) => {
-    data.functions.directMessage("=== Trusted Users ===`")
+    data.functions.directMessage("=== Trusted Users ===")
     data.functions.directMessage(Object.keys(configuration.trusted).join(', '))
 }

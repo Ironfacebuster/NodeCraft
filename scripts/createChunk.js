@@ -183,7 +183,7 @@ class Chunk {
             }
         }
 
-        console.log(binary)
+        // console.log(binary)
         // console.log(parseInt(binary.join(''), 2))
         return parseInt(binary.join(''), 2)
     }

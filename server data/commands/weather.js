@@ -15,6 +15,11 @@ const states = {
 }
 
 module.exports.execute = (data) => {
+    if (!data.arguments[0]) {
+        data.functions.directMessage(chatColor.gray(`Server weather is ${chatColor.gold(serverData.weather.isRaining ? "raining" : "clear")}`) + chatColor.gray("."))
+        return
+    }
+
     const set = data.arguments[0].toLowerCase()
 
     if (!states.hasOwnProperty(set)) return data.functions.directMessage(chatColor.red(`${data.arguments[0]} is not a valid weather state!`))

@@ -1,0 +1,41 @@
+{
+    "username": "§bServer§r",
+    "position": {
+        "x": 0,
+        "y": 0,
+        "z": 0,
+        "stance": 0,
+        "onground": false
+    },
+    "rotation": {
+        "yaw": 0,
+        "pitch": 0
+    },
+    "data": {
+        "health": 0,
+        "status": {
+            "sneaking": false,
+            "onFire": false,
+            "sleeping": false,
+            "drowning": false
+        },
+        "inventory": {
+            "slot": 0,
+            "hotbar": {},
+            "main": {},
+            "armor": {},
+            "crafting": {
+                "grid": [],
+                "result": {}
+            }
+        },
+        "flags": {
+            "fly": false
+        }
+    },
+    "status": {
+        "state": "loading",
+        "loaded": false
+    },
+    "created": 1609001402988
+}

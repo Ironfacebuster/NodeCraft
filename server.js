@@ -32,6 +32,7 @@ const server = net.createServer(),
     anticheat = require("./scripts/antiCheat.js")
 
 function loadconfig() {
+    logging.setCheckCommand(checkCommand)
     emitter.removeAllListeners()
     // console.log("=========================")
     console.log("Loading server.properties...")
@@ -392,7 +393,7 @@ function handlePacket(socket, packet, packetID, decoded) {
 
 function serverTick() {
     const currentTime = Date.now()
-    var offset = (currentTime - serverData.lastTick) - 50
+    var offset = (currentTime - serverData.lastTick) - 53
 
     if (currentTime - serverData.lastTick >= 250) console.warn("WARNING: Abnormal tick (over 0.25 seconds)")
     if (currentTime - serverData.lastTick >= 5000) console.warn("ALERT: Last tick was over five seconds ago! You should probably figure out what's making it lag!")
@@ -424,7 +425,7 @@ function serverTick() {
     serverData.ticks++
     serverData.lastTick = currentTime
 
-    setTimeout(serverTick, 50 - (offset + 10))
+    setTimeout(serverTick, 50 - (offset + 5))
 }
 
 // chat height is 20 rows.
@@ -562,7 +563,7 @@ function checkCommand(connection, message) {
         connections: connections
     }
 
-    console.log(`${connection.socket.username} executed ${message}`)
+    console.log(`${connection.socket.username.trim()} executed ${message}`)
     if (commands.hasOwnProperty(command)) {
         const c = commands[command]
 
@@ -585,6 +586,7 @@ function checkCommand(connection, message) {
 }
 
 function isTrusted(connection) {
+    if (connection.isServer) return true
     if (!configuration.trusted.hasOwnProperty(connection.username)) return false
     if (configuration.trusted[connection.username].indexOf(connection.socket.remoteAddress) == -1) return false
 

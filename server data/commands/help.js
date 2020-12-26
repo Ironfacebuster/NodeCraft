@@ -10,7 +10,8 @@ module.exports.data = {
     usage: "/help {optional command}"
 }
 
-const commands = getCommands()
+const commands = getCommands(true),
+    adminCommands = getCommands(false)
 const totalPages = Math.ceil(commands.aliases.length / 19)
 
 module.exports.execute = (data) => {
@@ -27,8 +28,15 @@ module.exports.execute = (data) => {
         // data.functions.directMessage(c)
         // })
 
-        data.functions.directMessage(chatColor.gray(`=== Commands List ===`))
-        data.functions.directMessage(commands.aliases.join(", "))
+        if (isTrusted(data.user.connection)) {
+            data.functions.directMessage(chatColor.gray(`=== Trusted Commands List ===`))
+            data.functions.directMessage(adminCommands.aliases.join(", "))
+        }
+        else {
+            data.functions.directMessage(chatColor.gray(`=== Commands List ===`))
+            data.functions.directMessage(commands.aliases.join(", "))
+        }
+
     } else {
         const c = commands[commandName]
         if (typeof c != "undefined") {
@@ -60,12 +68,14 @@ function getList(page) {
     // console.log(maxLength)
 }
 
-function getCommands() {
+function getCommands(admin) {
     var commands = {
         aliases: []
     }
     fs.readdirSync(configuration.commands).forEach(filename => {
         const command = require(`./${filename}`)
+        if (command.data.op && admin) return
+
         commands[command.data.name.substr(1, command.data.name.length)] = {
             alias: command.data.name.substr(1, command.data.name.length)
         }
@@ -78,4 +88,12 @@ function getCommands() {
         // commands.examples.push()
     })
     return commands
+}
+
+function isTrusted(connection) {
+    if (connection.hasOwnProperty("isServer") && connection.isServer) return true
+    if (!configuration.trusted.hasOwnProperty(connection.username)) return false
+    if (configuration.trusted[connection.username].indexOf(connection.socket.remoteAddress) == -1) return false
+
+    else return true
 }
