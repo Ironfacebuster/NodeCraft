@@ -164,7 +164,7 @@ server.on('connection', function (socket) {
     // When the client requests to end the TCP connection with the server, the server
     // ends the connection.
     socket.on('end', function () {
-        delete (connections[socket.id])
+        delete(connections[socket.id])
         playerManager.removePlayer(socket.username)
 
         if (socket.username && socket.destroyed == false)
@@ -425,7 +425,8 @@ function serverTick() {
     serverData.ticks++
     serverData.lastTick = currentTime
 
-    setTimeout(serverTick, 50 - (offset + 5))
+    // setTimeout(serverTick, 50 - (offset + 10))
+    setTimeout(serverTick, 50)
 }
 
 // chat height is 20 rows.
@@ -570,7 +571,7 @@ function checkCommand(connection, message) {
         const op = c.data.op || false
 
         if (op && !isTrusted(connection))
-            directMessage(connection, "You're not a trusted player!", true)
+            directMessage(connection, "§cYou're not a trusted player!", true)
         else {
             try {
                 c.execute(data)

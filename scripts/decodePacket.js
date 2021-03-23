@@ -207,7 +207,7 @@ function modifyinventory(p) {
     const action = parseInt(p[2].toString(16), 16)
     const slot = parseInt(p[3].toString(16), 16)
 
-    console.log(slot)
+    // console.log(action + ", " + slot)
 
     return {
         id: id,

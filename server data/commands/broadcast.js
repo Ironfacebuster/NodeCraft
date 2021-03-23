@@ -1,3 +1,5 @@
+chatColor = require('../../scripts/chatColor')
+
 module.exports.data = {
     name: "/broadcast",
     description: "Broadcast a message to all online players.",
@@ -6,5 +8,5 @@ module.exports.data = {
 }
 
 module.exports.execute = (data) => {
-    data.functions.broadcastMessage(`${configuration.serverPrefix}${data.arguments.join(' ')}`)
+    data.functions.broadcastMessage(`* ${chatColor.aqua(data.arguments.join(' '))}`)
 }
