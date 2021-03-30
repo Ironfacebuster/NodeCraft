@@ -7,7 +7,10 @@ const path = require('path'),
     decodePacket = require('./scripts/decodePacket.js'),
     playerManager = require('./scripts/playerManager.js'),
     logging = require('./scripts/logging'),
-    EventEmitter = require('events').EventEmitter
+    EventEmitter = require('events').EventEmitter,
+    { PacketManager, Chunk, Block } = require("./scripts/serverClasses")
+
+const packetManager = new PacketManager
 
 var emitter = new EventEmitter()
 
@@ -16,7 +19,11 @@ var commands = {}
 console.log("Starting server...")
 configuration = loadconfig()
 
+// An object containing all the currently connected players (keyed by their username)
+// This might need to be changed later
 connections = {}
+
+// This should be saved and loaded from the world file.
 serverData = {
     time: 0,
     days: 0,
@@ -156,7 +163,7 @@ server.on('connection', function (socket) {
                 handlePacket(socket, p, packetID, decoded)
             } catch (err) {
                 console.error("ERROR handling packet!")
-                console.log(err)
+                throw err
             }
         })
     })
@@ -240,9 +247,12 @@ function handlePacket(socket, packet, packetID, decoded) {
                 loaded: true
             }
 
-            socket.write(packet)
-            socket.write(Buffer.from(fs.readFileSync(configuration.worldFolder + "/tempchunk.txt").toString(), "hex"))
-            socket.write(newpacket)
+            packetManager.queuePacket(socket.id, packet)
+            // socket.write(packet)
+            packetManager.queuePacket(socket.id, Buffer.from(fs.readFileSync(configuration.worldFolder + "/tempchunk.txt").toString(), "hex"))
+            // socket.write(Buffer.from(fs.readFileSync(configuration.worldFolder + "/tempchunk.txt").toString(), "hex"))
+            packetManager.queuePacket(socket.id, newpacket)
+            // socket.write(newpacket)
         }
         // player.update(player)
 
@@ -259,6 +269,7 @@ function handlePacket(socket, packet, packetID, decoded) {
             ready: false
         }
 
+
         var player = playerManager.getPlayer(username)
 
         player.status = {
@@ -267,45 +278,14 @@ function handlePacket(socket, packet, packetID, decoded) {
         }
 
         socket.username = username
-        // const packet01response = createPacket("01", [{
-        //         data: 0,
-        //         type: "int"
-        //     },
-        //     {
-        //         data: "",
-        //         type: "string"
-        //     },
-        //     {
-        //         data: "default",
-        //         type: "string"
-        //     },
-        //     {
-        //         data: 0,
-        //         type: "int"
-        //     },
-        //     {
-        //         data: 0,
-        //         type: "int"
-        //     },
-        //     {
-        //         data: 1,
-        //         type: "byte"
-        //     },
-        //     {
-        //         data: 0,
-        //         type: "byte"
-        //     },
-        //     {
-        //         data: 0,
-        //         type: "byte"
-        //     }
-        // ])
+
         const packet01response = Buffer.from(fs.readFileSync(configuration.worldFolder + "/packet01response.txt").toString(), "hex")
-        socket.write(packet01response)
+
+        packetManager.queuePacket(socket.id, packet01response)
         broadcastMessage(`§e${socket.username} has joined.`)
         emitter.emit("join", playerManager.getPlayer(username))
 
-        socket.write(createPacket("04", [{
+        packetManager.queuePacket(socket.id, createPacket("04", [{
             data: serverData.time,
             type: "long"
         }]))
@@ -325,6 +305,8 @@ function handlePacket(socket, packet, packetID, decoded) {
             emitter.emit("join", playerManager.getPlayer(username))
         }
 
+        packetManager.addEndpoint(socket.id, socket)
+
         // no idea what this means. just sending data the official server sends.
         const array = [{
             data: "-",
@@ -333,7 +315,7 @@ function handlePacket(socket, packet, packetID, decoded) {
 
         const p = createPacket("02", array)
 
-        socket.write(p)
+        packetManager.queuePacket(socket.id, p)
     } else if (packetID == '0x03') {
         // CHAT packet
 
@@ -393,7 +375,7 @@ function handlePacket(socket, packet, packetID, decoded) {
 
 function serverTick() {
     const currentTime = Date.now()
-    var offset = (currentTime - serverData.lastTick) - 53
+    // var offset = (currentTime - serverData.lastTick) - 53
 
     if (currentTime - serverData.lastTick >= 250) console.warn("WARNING: Abnormal tick (over 0.25 seconds)")
     if (currentTime - serverData.lastTick >= 5000) console.warn("ALERT: Last tick was over five seconds ago! You should probably figure out what's making it lag!")
@@ -425,7 +407,10 @@ function serverTick() {
     serverData.ticks++
     serverData.lastTick = currentTime
 
-    setTimeout(serverTick, 50 - (offset + 5))
+    packetManager.distributePackets()
+
+    setTimeout(serverTick, 50)
+    // setTimeout(serverTick, 50 - (offset + 5))
 }
 
 // chat height is 20 rows.
@@ -444,8 +429,10 @@ async function broadcastMessage(message) {
 
         keys.forEach(key => {
             let conn = connections[key]
-            if (conn.socket.destroyed == false)
-                conn.socket.write(packet)
+            if (conn.socket.destroyed == false) {
+                packetManager.queuePacket(conn.socket.id, packet)
+            }
+            // conn.socket.write(packet)
         })
 
         logging.chat.logChat(m, "white")
@@ -465,7 +452,8 @@ async function directMessage(connection, message, isCommand) {
 
         const packet = createPacket("03", array)
 
-        connection.socket.write(packet)
+        packetManager.queuePacket(connection.socket.id, packet)
+        // connection.socket.write(packet)
 
         if (!isCommand)
             logging.chat.logChat(m, "white")
@@ -494,13 +482,15 @@ function divideMessage(message) {
 function sendPacket(username, buffer) {
     Object.keys(connections).forEach(key => {
         if (connections[key].socket.username == username)
-            connections[key].socket.write(buffer)
+            packetManager.queuePacket(connections[key].socket.id, buffer)
+        // connections[key].socket.write(buffer)
     })
 }
 
 function broadcastPacket(buffer) {
     Object.keys(connections).forEach(key => {
-        connections[key].socket.write(buffer)
+        packetManager.queuePacket(connections[key].socket.id, buffer)
+        // connections[key].socket.write(buffer)
     })
 }
 
@@ -538,7 +528,7 @@ function checkCommand(connection, message) {
     const args = message.split(' ')
     const command = args.shift()
 
-    // console.log(command, args)
+    if (connection.id == "SERVER") packetManager.addEndpoint("SERVER", connection)
 
     const data = {
         command: command,
@@ -570,14 +560,14 @@ function checkCommand(connection, message) {
         const op = c.data.op || false
 
         if (op && !isTrusted(connection))
-            directMessage(connection, "You're not a trusted player!", true)
+            directMessage(connection, "§cYou're not a trusted player!", true)
         else {
             try {
                 c.execute(data)
             } catch (err) {
                 directMessage(connection, `§cError executing command ${command}. Check console for details.`, true)
                 console.error(`Error while executing command ${command}`)
-                console.log(err)
+                throw err
             }
         }
     } else directMessage(connection, "Command not found.", true)
