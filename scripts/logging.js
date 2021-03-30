@@ -284,7 +284,7 @@ async function applySettings() {
 }
 
 var lastCheck = Date.now()
-var lastticks = 0
+var lastticks = -1
 var tps = 0
 var totalTps = 0
 var checks = 0
@@ -303,6 +303,8 @@ async function drawInfo() {
     drawText(quarter + 2, 5, `${padDecimal(Math.ceil((ram.heapUsed / 1048576) * 100) / 100, 2, 0)}/${padDecimal(Math.ceil((ram.heapTotal / 1048576) * 100) / 100, 2, 0)}MB   `)
 
     // const tick = Date.now() - serverData.lastTick
+
+    if (lastticks == -1) lastticks = serverData.ticks
 
     if (Date.now() - lastCheck >= 1000) {
         tps = serverData.ticks - lastticks
