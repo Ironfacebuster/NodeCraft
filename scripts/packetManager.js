@@ -33,7 +33,7 @@ class PacketManager {
         if (!this.endpoints.hasOwnProperty(id))
             throw new Error(`Endpoint (${id}) not found!`)
 
-        delete (this.endpoints[id])
+        delete(this.endpoints[id])
     }
 
     getEndpoint(id) {
@@ -44,8 +44,7 @@ class PacketManager {
     }
 
     queuePacket(id, packet) {
-        if (!this.endpoints.hasOwnProperty(id))
-            throw new Error(`Endpoint (${id}) not found!`)
+        if (!this.endpoints.hasOwnProperty(id)) return
 
         this.endpoints[id].packets.push(packet)
     }
