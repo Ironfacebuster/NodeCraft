@@ -24,6 +24,7 @@ var emitter = new EventEmitter()
 
 var commands = {}
 
+console.clear()
 console.log("Starting server...")
 configuration = loadconfig()
 
@@ -213,175 +214,248 @@ function splitPacket(packet, seperator) {
     return [packet]
 }
 
-function handlePacket(socket, packet, packetID, decoded) {
-    // const arr = packet.toString().split('')
-    if (packetID == '0x00') {
-        // Keep Alive
-        // Apparently sends out a "keep alive" ID
-
-        // Byte 2 seems to be the position update packet ID (0x0b)
-        // It sometimes sends what seems to be a position update. (x:8.5 y:52.998404178607224 stance:54.618404183375596 z:8.5 onground:false)
-
-        const player = playerManager.getPlayer(socket.username)
-
-        if (player && player.status.state == "loading") {
-
-            const array = [{
-                data: player.position.x,
-                type: "double"
-            }, {
-                data: Math.max(1.6, player.position.y),
-                type: "double"
-            }, {
-                data: Math.max(0, player.position.stance),
-                type: "double"
-            }, {
-                data: player.position.z,
-                type: "double"
-            }, {
-                data: player.position.onground,
-                type: "boolean"
-            }]
-
-            const newpacket = createPacket("0b", array)
-
-            const id = packet.toString()
-            // "keepaliveid" doesn't really seem like an ID.
-            connections[socket.id].keepaliveid = id
-            connections[socket.id].ready = true
-
-            player.status = {
-                state: "loaded",
-                loaded: true
-            }
-
-            packetManager.queuePacket(socket.id, packet)
-            // socket.write(packet)
-            packetManager.queuePacket(socket.id, Buffer.from(fs.readFileSync(configuration.worldFolder + "/tempchunk.txt").toString(), "hex"))
-            // socket.write(Buffer.from(fs.readFileSync(configuration.worldFolder + "/tempchunk.txt").toString(), "hex"))
-            packetManager.queuePacket(socket.id, newpacket)
-            // socket.write(newpacket)
-        }
-        // player.update(player)
-
-    } else if (packetID == '0x01') {
-        // LOGIN packet?
-        // Packet ID 0x01 is sent AFTER 0x02.
-
-        // const login = decodePacket(packet)
-        const username = decoded.data.username
-
-        connections[socket.id] = {
-            username: username,
-            socket: socket,
-            ready: false
-        }
-
-
-        var player = playerManager.getPlayer(username)
-
-        player.status = {
-            state: "loading",
-            loaded: false
-        }
-
-        socket.username = username
-
-        const packet01response = Buffer.from(fs.readFileSync(configuration.worldFolder + "/packet01response.txt").toString(), "hex")
-
-        packetManager.queuePacket(socket.id, packet01response)
-        broadcastMessage(`§e${socket.username} has joined.`)
-        emitter.emit("join", playerManager.getPlayer(username))
-
-        packetManager.queuePacket(socket.id, createPacket("04", [{
-            data: serverData.time,
-            type: "long"
-        }]))
-    } else if (packetID == '0x02') {
-        // LOGIN packet?
-        // Sending what seems to be identical data back works.
-
-        const username = decoded.data.username
-
-        // console.log("Packet ID 0x02:",string)
-        // The client sends its USERNAME. This could be the login packet.
-
-        // If the playerdata doesn't exist, create it.
-        if (username != null) {
-            playerManager.getPlayer(username)
-            broadcastMessage(`§e${username} has joined.`)
-            emitter.emit("join", playerManager.getPlayer(username))
-        }
-
-        packetManager.addEndpoint(socket.id, socket)
-
-        // no idea what this means. just sending data the official server sends.
-        const array = [{
-            data: "-",
-            type: "string"
-        }]
-
-        const p = createPacket("02", array)
-
-        packetManager.queuePacket(socket.id, p)
-    } else if (packetID == '0x03') {
-        // CHAT packet
-
-        const content = decoded.data.text
-        const message = `${socket.username}${configuration.userSuffix}${content}`
-
-        const res = checkCommand(connections[socket.id], content)
-
-        if (!res) {
-            broadcastMessage(message)
-            emitter.emit("chat", playerManager.getPlayer(socket.username))
-        }
-    } else if (packetID == "0x0b") {
-        // POSITION UPDATE packet
-
-        var player = playerManager.getPlayer(socket.username)
-        player.position = decoded.data.position
-
-    } else if (packetID == "0x0c") {
-        // ROTATION UPDATE packet
-
-        var player = playerManager.getPlayer(socket.username)
-        player.rotation = decoded.data.rotation
-
-    } else if (packetID == "0x0d") {
-        // POSITION & ROTATION UPDATE packet
-
-        var player = playerManager.getPlayer(socket.username)
-
-        player.position = decoded.data.position
-        player.rotation = decoded.data.rotation
-
-    } else if (packetID == "0x10") {
-        const data = decoded.data
-
-        playerManager.getPlayer(socket.username).data.inventory.slot = data.slot
-    } else if (packetID == "0xff") {
-        // LOGOUT packet
-        // packetManager.removeEndpoint(socket.id)
-        var player = playerManager.getPlayer(socket.username)
-
-        emitter.emit("leave", player)
-
-        player.status = {
-            state: "left",
-            loaded: false
-        }
-
-
-        if (socket.username)
-            broadcastMessage(`§e${socket.username} has left.`)
-
-        connections[socket.id].nochat = true
-        connections[socket.id].socket.destroyed = true
+function handlePacket(s, p, pi, d) {
+    const packed = {
+        socket: s,
+        packet: p,
+        id: pi,
+        decoded: d
     }
 
-    if (configuration.useAntiCheat) anticheat(socket)
+    switch (pi) {
+        case "0x00":
+            KeepAlivePacket(packed)
+            break
+        case "0x01":
+            LoginPacket(packed)
+            break
+        case "0x02":
+            Login2Packet(packed)
+            break
+        case "0x03":
+            ChatPacket(packed)
+            break
+        case "0x0b":
+            UpdatePositionPacket(packed)
+            break
+        case "0x0c":
+            UpdateRotationPacket(packed)
+            break
+        case "0x0d":
+            UpdatePosAndRotPacket(packed)
+            break
+        case "0x10":
+            UpdateSelectedSlotPacket(packed)
+            break
+        case "0xff":
+            LogoutPacket(packed)
+            break
+    }
+
+    if (configuration.useAntiCheat) anticheat(s)
 }
+
+// PACKET FUNCTIONS
+
+function KeepAlivePacket(packed) {
+    const socket = packed.socket,
+        packet = packed.packet
+    // Keep Alive
+    // Apparently sends out a "keep alive" ID
+
+    // Byte 2 seems to be the position update packet ID (0x0b)
+    // It sometimes sends what seems to be a position update. (x:8.5 y:52.998404178607224 stance:54.618404183375596 z:8.5 onground:false)
+
+    const player = playerManager.getPlayer(socket.username)
+
+    if (player && player.status.state == "loading") {
+
+        const array = [{
+            data: player.position.x,
+            type: "double"
+        }, {
+            data: Math.max(1.6, player.position.y),
+            type: "double"
+        }, {
+            data: Math.max(0, player.position.stance),
+            type: "double"
+        }, {
+            data: player.position.z,
+            type: "double"
+        }, {
+            data: player.position.onground,
+            type: "boolean"
+        }]
+
+        const newpacket = createPacket("0b", array)
+
+        const id = packet.toString()
+        // "keepaliveid" doesn't really seem like an ID.
+        connections[socket.id].keepaliveid = id
+        connections[socket.id].ready = true
+
+        player.status = {
+            state: "loaded",
+            loaded: true
+        }
+
+        packetManager.queuePacket(socket.id, packet)
+        // socket.write(packet)
+        packetManager.queuePacket(socket.id, Buffer.from(fs.readFileSync(configuration.worldFolder + "/tempchunk.txt").toString(), "hex"))
+        // socket.write(Buffer.from(fs.readFileSync(configuration.worldFolder + "/tempchunk.txt").toString(), "hex"))
+        packetManager.queuePacket(socket.id, newpacket)
+        // socket.write(newpacket)
+    }
+}
+
+function LoginPacket(packed) {
+    const socket = packed.socket,
+        decoded = packed.decoded
+    // LOGIN packet?
+    // Packet ID 0x01 is sent AFTER 0x02.
+
+    // const login = decodePacket(packet)
+    const username = decoded.data.username
+
+    connections[socket.id] = {
+        username: username,
+        socket: socket,
+        ready: false
+    }
+
+
+    var player = playerManager.getPlayer(username)
+
+    player.status = {
+        state: "loading",
+        loaded: false
+    }
+
+    socket.username = username
+
+    const packet01response = Buffer.from(fs.readFileSync(configuration.worldFolder + "/packet01response.txt").toString(), "hex")
+
+    packetManager.queuePacket(socket.id, packet01response)
+    broadcastMessage(`§e${socket.username} has joined.`)
+    emitter.emit("join", playerManager.getPlayer(username))
+
+    packetManager.queuePacket(socket.id, createPacket("04", [{
+        data: serverData.time,
+        type: "long"
+    }]))
+}
+
+function Login2Packet(packed) {
+    const socket = packed.socket,
+        decoded = packed.decoded
+    // LOGIN packet?
+    // Sending what seems to be identical data back works.
+
+    const username = decoded.data.username
+
+    // console.log("Packet ID 0x02:",string)
+    // The client sends its USERNAME. This could be the login packet.
+
+    // If the playerdata doesn't exist, create it.
+    if (username != null) {
+        playerManager.getPlayer(username)
+        broadcastMessage(`§e${username} has joined.`)
+        emitter.emit("join", playerManager.getPlayer(username))
+    }
+
+    packetManager.addEndpoint(socket.id, socket)
+
+    // no idea what this means. just sending data the official server sends.
+    const array = [{
+        data: "-",
+        type: "string"
+    }]
+
+    const p = createPacket("02", array)
+
+    packetManager.queuePacket(socket.id, p)
+}
+
+function ChatPacket(packed) {
+    const socket = packed.socket,
+        decoded = packed.decoded
+
+    // CHAT packet
+
+    const content = decoded.data.text
+    const message = `${socket.username}${configuration.userSuffix}${content}`
+
+    const res = checkCommand(connections[socket.id], content)
+
+    if (!res) {
+        broadcastMessage(message)
+        emitter.emit("chat", playerManager.getPlayer(socket.username))
+    }
+}
+
+function UpdatePositionPacket(packed) {
+    const socket = packed.socket,
+        decoded = packed.decoded
+
+    // POSITION UPDATE packet
+
+    var player = playerManager.getPlayer(socket.username)
+    player.position = decoded.data.position
+}
+
+function UpdateRotationPacket(packed) {
+    const socket = packed.socket,
+        decoded = packed.decoded
+
+    // ROTATION UPDATE packet
+
+    var player = playerManager.getPlayer(socket.username)
+    player.rotation = decoded.data.rotation
+}
+
+function UpdatePosAndRotPacket(packed) {
+    const socket = packed.socket,
+        decoded = packed.decoded
+
+    // POSITION & ROTATION UPDATE packet
+
+    var player = playerManager.getPlayer(socket.username)
+
+    player.position = decoded.data.position
+    player.rotation = decoded.data.rotation
+}
+
+function UpdateSelectedSlotPacket(packed) {
+    const decoded = packed.decoded,
+        socket = packed.socket
+    const data = decoded.data
+
+    playerManager.getPlayer(socket.username).data.inventory.slot = data.slot
+}
+
+function LogoutPacket(packed) {
+    const socket = packed.socket
+    // LOGOUT packet
+    // packetManager.removeEndpoint(socket.id)
+    var player = playerManager.getPlayer(socket.username)
+
+    emitter.emit("leave", player)
+
+    player.status = {
+        state: "left",
+        loaded: false
+    }
+
+
+    if (socket.username)
+
+        broadcastMessage(`§e${socket.username} has left.`)
+
+    connections[socket.id].nochat = true
+    connections[socket.id].socket.destroyed = true
+}
+
+// END PACKET FUNCTIONS
 
 function serverTick() {
     const currentTime = Date.now()
