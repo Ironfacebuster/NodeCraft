@@ -42,6 +42,7 @@ class Chunk {
      */
     setBlock(x, y, z, block) {
         this.blocks[y][x + z * this.width] = block
+        block.chunk = this
     }
     /** @param {Array} blocks */
     setBlocks(blocks) {
@@ -173,9 +174,10 @@ class Chunk {
 
             // if (binary[i] == 0)
             binary[i] = 0
-            for (var y = i; y < i + 16; ++y) {
-                for (var x = 0; x < 16; ++x) {
-                    for (var z = 0; z < 16; ++z) {
+
+            for (var x = 0; x < 16; ++x) {
+                for (var z = 0; z < 16; ++z) {
+                    for (var y = i; y < i + 16; ++y) {
                         const thisBlock = this.getBlock(x, y, z)
                         if (Object.keys(thisBlock).length > 0) binary[i] = 1
                     }
@@ -228,6 +230,7 @@ class Block {
             z: 0
         }
     }
+    chunk
 
     /**
      * @param {number} id - The block ID
