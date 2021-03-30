@@ -31,21 +31,33 @@ module.exports.execute = (data) => {
         if (isTrusted(data.user.connection)) {
             data.functions.directMessage(chatColor.gray(`=== Trusted Commands List ===`))
             data.functions.directMessage(adminCommands.aliases.join(", "))
-        }
-        else {
+        } else {
             data.functions.directMessage(chatColor.gray(`=== Commands List ===`))
             data.functions.directMessage(commands.aliases.join(", "))
         }
 
     } else {
-        const c = commands[commandName]
-        if (typeof c != "undefined") {
-            data.functions.directMessage(`=== Command Help ===`)
-            data.functions.directMessage(`Command Alias: §6/${c.alias}`)
-            if (c.usage) data.functions.directMessage(`Usage: §6${c.usage}`)
-            if (c.desc) data.functions.directMessage(`Description: §6${c.desc}`)
-            if (c.op) data.functions.directMessage(`§4TRUSTED only!`)
-        } else data.functions.directMessage(`Unknown command.`)
+        if (!isTrusted(data.user.connection)) {
+            const c = commands[commandName]
+
+            if (typeof c != "undefined") {
+                data.functions.directMessage(`=== Command Help ===`)
+                data.functions.directMessage(`Command Alias: §6/${c.alias}`)
+                if (c.usage) data.functions.directMessage(`Usage: §6${c.usage}`)
+                if (c.desc) data.functions.directMessage(`Description: §6${c.desc}`)
+                if (c.op) data.functions.directMessage(`§4TRUSTED only!`)
+            } else data.functions.directMessage(`Unknown command.`)
+        } else {
+            const c = adminCommands[commandName]
+
+            if (typeof c != "undefined") {
+                data.functions.directMessage(`=== Command Help ===`)
+                data.functions.directMessage(`Command Alias: §6/${c.alias}`)
+                if (c.usage) data.functions.directMessage(`Usage: §6${c.usage}`)
+                if (c.desc) data.functions.directMessage(`Description: §6${c.desc}`)
+                if (c.op) data.functions.directMessage(`§4TRUSTED only!`)
+            } else data.functions.directMessage(`Unknown command.`)
+        }
     }
 }
 
