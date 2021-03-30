@@ -2,21 +2,28 @@ const fs = require('fs')
 
 // world data will eventually be generated later
 const worlddata = {
-    "spawn": {
-        "position": {
-            "x": 3.5,
-            "y": 63,
-            "z": -49.5,
-            "stance": 63,
-            "onground": true
+    spawn: {
+        position: {
+            x: 3.5,
+            y: 63,
+            z: -49.5,
+            stance: 63,
+            onground: true
         },
-        "rotation": {
-            "yaw": 0,
-            "pitch": 0
+        rotation: {
+            yaw: 0,
+            pitch: 0
         }
     },
-    "world": {
-        "time": 0
+    world: {
+        time: 0,
+        days: 0,
+        ticks: 0,
+        lastTick: Date.now(),
+        lastTimeUpdate: Date.now(),
+        weather: {
+            isRaining: false
+        }
     }
 }
 
@@ -57,22 +64,36 @@ playerFolder=./server data/users
 worldFolder=./server data/world`
 
 const folders = [{
-    dir: "./server data", name: "logs"
-}, {
-    dir: "./server data", name: "users"
-}, {
-    dir: "./server data", name: "world"
-}], files = [{
-    dir: "./server data", name: "trusted.json", data: "{}"
-}, {
-    dir: "./server data/world", name: "worlddata.json", data: JSON.stringify(worlddata)
-}, {
-    dir: "./server data/world", name: "tempchunk.txt", data: tempchunk
-}, {
-    dir: "./server data/world", name: "packet01response.txt", data: packet01response
-}, {
-    dir: "./", name: "server.properties", data: properties
-}]
+        dir: "./server data",
+        name: "logs"
+    }, {
+        dir: "./server data",
+        name: "users"
+    }, {
+        dir: "./server data",
+        name: "world"
+    }],
+    files = [{
+        dir: "./server data",
+        name: "trusted.json",
+        data: "{}"
+    }, {
+        dir: "./server data/world",
+        name: "worlddata.json",
+        data: JSON.stringify(worlddata)
+    }, {
+        dir: "./server data/world",
+        name: "tempchunk.txt",
+        data: tempchunk
+    }, {
+        dir: "./server data/world",
+        name: "packet01response.txt",
+        data: packet01response
+    }, {
+        dir: "./",
+        name: "server.properties",
+        data: properties
+    }]
 
 
 module.exports = () => {

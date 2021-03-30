@@ -14,9 +14,7 @@ const path = require('path'),
         Block
     } = require("./scripts/serverClasses")
 
-const setup = require("./scripts/setup")
-
-setup()
+require("./scripts/setup")()
 
 const packetManager = new PacketManager
 
@@ -33,16 +31,8 @@ configuration = loadconfig()
 connections = {}
 
 // This should be saved and loaded from the world file.
-serverData = {
-    time: 0,
-    days: 0,
-    ticks: 0,
-    lastTick: Date.now(),
-    lastTimeUpdate: Date.now(),
-    weather: {
-        isRaining: false
-    }
-}
+serverData,
+worldData
 
 const server = net.createServer(),
     anticheat = require("./scripts/antiCheat.js")
@@ -79,6 +69,12 @@ function loadconfig() {
 
     conf.nolog = conf.nolog.split(/,/g)
     conf.trusted = JSON.parse(fs.readFileSync(conf.trusts).toString())
+
+    console.log("Loading world data...")
+    worldData = JSON.parse(fs.readFileSync("./server data/world/worlddata.json"))
+    serverData = worldData.world
+    serverData.lastTick = Date.now()
+    serverData.lastTimeUpdate = Date.now()
 
     console.log("Setting configuration...")
     configuration = conf
@@ -138,6 +134,11 @@ function loadconfig() {
 
     return conf
 }
+
+process.on("exit", () => {
+    console.log("Saving world data...")
+    fs.writeFileSync("./server data/world/worlddata.json", JSON.stringify(worldData))
+})
 
 function logBuffer(buffer, skipID) {
     const buf = buffer.toString('hex')
@@ -366,6 +367,7 @@ function Login2Packet(packed) {
     packetManager.addEndpoint(socket.id, socket)
 
     // no idea what this means. just sending data the official server sends.
+    // maybe something to do with username verification?
     const array = [{
         data: "-",
         type: "string"
@@ -459,7 +461,6 @@ function LogoutPacket(packed) {
 
 function serverTick() {
     const currentTime = Date.now()
-    // var offset = (currentTime - serverData.lastTick) - 53
 
     if (currentTime - serverData.lastTick >= 250) console.warn("WARNING: Abnormal tick (over 0.25 seconds)")
     if (currentTime - serverData.lastTick >= 5000) console.warn("ALERT: Last tick was over five seconds ago! You should probably figure out what's making it lag!")
@@ -597,7 +598,7 @@ function keepAlive() {
 
     keys.forEach(key => {
         let conn = connections[key]
-        // console.log(conn.keepaliveid.split(''))
+
         conn.socket.write(keep.join(''))
         conn.socket.write(packet)
     })
@@ -665,16 +666,5 @@ function isTrusted(connection) {
     else return true
 }
 
-const {
-    connect
-} = require('http2')
-const {
-    setIntervalAsync,
-    clearIntervalAsync
-} = require('set-interval-async/dynamic')
-
 setInterval(keepAlive, 10000)
 serverTick()
-// setInterval(serverTick, 50)
-
-// setIntervalAsync(serverTick, 50)
