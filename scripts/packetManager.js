@@ -52,7 +52,8 @@ class PacketManager {
 
     sendPacket(endpoint, packet) {
         const s = endpoint.socket
-        if (s.destroyed) return this.removeEndpoint(socket.id)
+        if (!s) return
+        if (s && s.destroyed) return this.removeEndpoint(s.id)
 
         s.write(packet)
     }
