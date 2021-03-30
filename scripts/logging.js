@@ -87,7 +87,7 @@ async function clearArea(x, y, width, height) {
     const w = blankLine.substr(0, width - 2)
     // setCursorPosition(x,y)
 
-    for (var i = 0; i < (height - y); i++) {
+    for (var i = 0; i <= (height - y); i++) {
         // setCursorPosition(x,y+i)
         drawText(x, y + i, "║" + w + "║")
     }
@@ -211,38 +211,42 @@ function drawOverlay(noclear) {
 
     // Draw various UI elements that only have to be drawn once.
     if (!noclear) {
+        const width = process.stdout.columns - Math.ceil(process.stdout.columns / 2)
         clearArea(0, 1, Math.ceil(process.stdout.columns / 2), Math.ceil(process.stdout.rows / 2) - 1)
-        clearArea(Math.ceil(process.stdout.columns / 2), 1, Math.ceil(process.stdout.columns / 2) - 1, Math.ceil(process.stdout.rows / 2) - 1)
+        clearArea(Math.ceil(process.stdout.columns / 2), 1, width, Math.ceil(process.stdout.rows / 2) - 1)
         clearArea(0, Math.ceil(process.stdout.rows / 2), process.stdout.columns, process.stdout.rows - 1)
     }
+
+    const rightWall = process.stdout.columns
+
     drawLine(0, 0, process.stdout.columns, true)
     drawText(2, 0, " Server Information ")
     drawLine(0, Math.ceil(process.stdout.rows / 2) - 1, process.stdout.columns, true)
     drawText(2, Math.ceil(process.stdout.rows / 2) - 1, " Chat Log ")
     drawText(0, 0, "╔")
-    drawText(process.stdout.columns, 0, "╗")
+    drawText(rightWall, 0, "╗")
     drawText(0, Math.ceil(process.stdout.rows / 2) - 1, "╠")
-    drawText(process.stdout.columns, Math.ceil(process.stdout.rows / 2) - 1, "╣")
+    drawText(rightWall, Math.ceil(process.stdout.rows / 2) - 1, "╣")
     drawText(Math.ceil(process.stdout.columns / 2) - 1, 0, "╦╦")
     drawText(Math.ceil(process.stdout.columns / 2) - 1, Math.ceil(process.stdout.rows / 2) - 1, "╩╩")
     drawLine(0, process.stdout.rows, process.stdout.columns, true)
     drawText(0, process.stdout.rows, "╚")
-    drawText(process.stdout.columns, process.stdout.rows, "╝")
+    drawText(rightWall, process.stdout.rows, "╝")
 }
 
 process.stdout.on('resize', () => {
+
     applySettings()
     renderLines()
-
-    // Clear the chat log (does not clear internal log)
-    chatLog = []
-    // Clearing the chat log is easier than going through the chatlog again, and redividing everything in it
 
     // Clear the console
     console.clear()
 
     // Redraw UI elements.
     drawOverlay()
+
+    // Redraw chat log
+    drawChatLog()
 })
 
 async function interval() {
@@ -437,8 +441,8 @@ console.append = (string) => {
 
 function timestamp() {
     const d = new Date().toISOString().
-        replace(/T/, ' '). // replace T with a space
-        replace(/\..+/, '') // delete the dot and everything after
+    replace(/T/, ' '). // replace T with a space
+    replace(/\..+/, '') // delete the dot and everything after
 
     return "(" + d + ")"
 }
