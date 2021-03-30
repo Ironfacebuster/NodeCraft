@@ -8,7 +8,11 @@ const path = require('path'),
     playerManager = require('./scripts/playerManager.js'),
     logging = require('./scripts/logging'),
     EventEmitter = require('events').EventEmitter,
-    { PacketManager, Chunk, Block } = require("./scripts/serverClasses")
+    {
+        PacketManager,
+        Chunk,
+        Block
+    } = require("./scripts/serverClasses")
 
 const setup = require("./scripts/setup")
 
@@ -175,7 +179,7 @@ server.on('connection', function (socket) {
     // When the client requests to end the TCP connection with the server, the server
     // ends the connection.
     socket.on('end', function () {
-        delete (connections[socket.id])
+        delete(connections[socket.id])
         playerManager.removePlayer(socket.username)
 
         if (socket.username && socket.destroyed == false)
@@ -386,19 +390,15 @@ function serverTick() {
     if (currentTime - serverData.lastTick >= 250) console.warn("WARNING: Abnormal tick (over 0.25 seconds)")
     if (currentTime - serverData.lastTick >= 5000) console.warn("ALERT: Last tick was over five seconds ago! You should probably figure out what's making it lag!")
     if (currentTime - serverData.lastTimeUpdate >= 1000) {
-        const keys = Object.keys(connections)
 
+        // create a "time" packet
         const packet = createPacket("04", [{
             data: serverData.time,
             type: "long"
         }])
 
-        keys.forEach(key => {
-            let conn = connections[key]
-
-            if (playerManager.getPlayer(conn.socket.username).status.loaded)
-                conn.socket.write(packet)
-        })
+        // broadcast the "time" packet
+        broadcastPacket(packet, true)
 
         serverData.lastTimeUpdate = currentTime
     }
@@ -413,10 +413,10 @@ function serverTick() {
     serverData.ticks++
     serverData.lastTick = currentTime
 
+    // Tell the packet manager to distribute all queued packets
     packetManager.distributePackets()
 
     setTimeout(serverTick, 50)
-    // setTimeout(serverTick, 50 - (offset + 5))
 }
 
 // chat height is 20 rows.
@@ -493,10 +493,12 @@ function sendPacket(username, buffer) {
     })
 }
 
-function broadcastPacket(buffer) {
+function broadcastPacket(buffer, noqueue) {
     Object.keys(connections).forEach(key => {
-        packetManager.queuePacket(connections[key].socket.id, buffer)
-        // connections[key].socket.write(buffer)
+        if (!noqueue || noqueue == false)
+            packetManager.queuePacket(connections[key].socket.id, buffer)
+        else if (noqueue == true)
+            connections[key].socket.write(buffer)
     })
 }
 
