@@ -182,6 +182,7 @@ async function serverChat(message) {
     const serverConnection = {
         isServer: true,
         socket: {
+            id: "SERVER",
             username: "§bServer§r",
             write: (packet) => {
                 const mes = decodePacket(packet, packet).data.text
@@ -192,10 +193,10 @@ async function serverChat(message) {
     }
 
     drawOverlay(true)
-    if (checkCommand(serverConnection, message)) {
 
+    if (checkCommand(serverConnection, message))
         return
-    }
+
     chat.broadcast(configuration.serverPrefix + message)
 }
 
@@ -308,7 +309,7 @@ async function drawInfo() {
         lastCheck = Date.now()
     }
 
-    drawText(1, 7, "Tick Per Second")
+    drawText(1, 7, "Ticks Per Second")
     drawBar(1, 8, quarter, tps, 40)
     drawText(quarter + 2, 8, `${tps}tps   `)
 
@@ -511,7 +512,7 @@ function colorLog(message) {
 process.on('exit', () => {
     fs.writeFileSync("./server data/logs/" + safeTimestamp() + ".txt", fullLog.join('\r\n'))
     cursor.show()
-    console.clear()
+    // console.clear()
 })
 
 function padDecimal(number, length, padding) {
