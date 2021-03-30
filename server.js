@@ -10,6 +10,10 @@ const path = require('path'),
     EventEmitter = require('events').EventEmitter,
     { PacketManager, Chunk, Block } = require("./scripts/serverClasses")
 
+const setup = require("./scripts/setup")
+
+setup()
+
 const packetManager = new PacketManager
 
 var emitter = new EventEmitter()
@@ -354,6 +358,7 @@ function handlePacket(socket, packet, packetID, decoded) {
         playerManager.getPlayer(socket.username).data.inventory.slot = data.slot
     } else if (packetID == "0xff") {
         // LOGOUT packet
+        // packetManager.removeEndpoint(socket.id)
         var player = playerManager.getPlayer(socket.username)
 
         emitter.emit("leave", player)
@@ -362,6 +367,7 @@ function handlePacket(socket, packet, packetID, decoded) {
             state: "left",
             loaded: false
         }
+
 
         if (socket.username)
             broadcastMessage(`§e${socket.username} has left.`)
