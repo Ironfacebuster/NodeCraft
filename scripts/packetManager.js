@@ -59,11 +59,13 @@ class PacketManager {
 
     // Called every tick
     distributePackets() {
-        Object.keys(this.endpoints).forEach(k => {
+        Object.keys(this.endpoints).forEach(async (k) => {
             var ep = this.endpoints[k]
 
-            if (ep.packets.length > 0)
+            while (ep.packets.length > 0)
                 this.sendPacket(ep, ep.packets.shift())
+
+            // if (ep.packets.length > 0)
 
             // Add code to decide whether or not to combine packets
             // I'm not entirely sure that every packet can be combined
